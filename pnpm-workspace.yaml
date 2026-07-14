@@ -4,3 +4,5 @@ allowBuilds:
   sharp: set this to true or false
 minimumReleaseAgeExclude:
   - '@supabase/ssr@0.12.1'
+overrides:
+  hono: 4.12.25
