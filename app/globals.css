@@ -11,7 +11,7 @@
   --card-foreground: #182019;
   --popover: #fbfaf5;
   --popover-foreground: #182019;
-  --primary: #df4b25;
+  --primary: #8b1ab8;
   --primary-foreground: #fffaf1;
   --secondary: #e5e0d4;
   --secondary-foreground: #182019;
@@ -19,11 +19,11 @@
   --muted-foreground: #687069;
   --accent: #1c6547;
   --accent-foreground: #fffaf1;
-  --destructive: #b63826;
+  --destructive: #26b626;
   --destructive-foreground: #fffaf1;
   --border: #cfc9bc;
   --input: #cfc9bc;
-  --ring: #df4b25;
+  --ring: #25df35;
   --radius: 0.15rem;
 }
 

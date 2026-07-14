@@ -3,10 +3,11 @@
 import { z } from "zod"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
-import { uploadProductImage } from "@/lib/supabase/storage-admin"
+import { eq, and, asc, inArray } from "drizzle-orm"
+import { requireAdminAction } from "@/lib/auth-helpers"
+import { uploadProductFile } from "@/lib/supabase/storage-admin"
 import { db } from "@/lib/db"
-import { products } from "@/lib/db/schema"
+import { products, productMedia } from "@/lib/db/schema"
 
 const productSchema = z.object({
   name: z.string().min(2),
@@ -23,18 +24,8 @@ const productSchema = z.object({
   isFeatured: z.boolean().optional(),
 })
 
-async function assertAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email?.toLowerCase() !== process.env.ADMIN_EMAIL?.toLowerCase()) {
-    throw new Error("Not authorized")
-  }
-}
-
-export async function createProduct(formData: FormData) {
-  await assertAdmin()
-
-  const data = productSchema.parse({
+function parseProductFields(formData: FormData) {
+  return productSchema.parse({
     name: formData.get("name"),
     brand: formData.get("brand"),
     category: formData.get("category"),
@@ -48,15 +39,28 @@ export async function createProduct(formData: FormData) {
     stock: formData.get("stock"),
     isFeatured: formData.get("isFeatured") === "on",
   })
+}
 
-  const image = formData.get("image")
-  if (!(image instanceof File) || image.size === 0) throw new Error("Product image is required")
+function validFiles(formData: FormData, field: string) {
+  return formData.getAll(field).filter((file): file is File => file instanceof File && file.size > 0)
+}
 
-  const imageUrl = await uploadProductImage(image)
+export async function createProduct(formData: FormData) {
+  await requireAdminAction()
+
+  const data = parseProductFields(formData)
+  const images = validFiles(formData, "images")
+  if (images.length === 0) throw new Error("At least one product image is required")
+  const video = validFiles(formData, "video")[0]
+
+  const imageUrls = await Promise.all(images.map((file) => uploadProductFile(file)))
+  const videoUrl = video ? await uploadProductFile(video) : null
+
+  const productId = crypto.randomUUID()
   const slug = `${data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Date.now().toString().slice(-5)}`
 
   await db.insert(products).values({
-    id: crypto.randomUUID(),
+    id: productId,
     slug,
     name: data.name,
     brand: data.brand,
@@ -67,14 +71,71 @@ export async function createProduct(formData: FormData) {
     conditionNotes: data.conditionNotes,
     price: data.price,
     compareAtPrice: data.compareAtPrice,
-    imageUrl,
+    imageUrl: imageUrls[0],
     imageAlt: data.name,
     color: data.color,
     isFeatured: data.isFeatured ?? false,
     stock: data.stock,
   })
 
+  const mediaRows = imageUrls.map((url, index) => ({ id: crypto.randomUUID(), productId, url, kind: "image", sortOrder: index }))
+  if (videoUrl) mediaRows.push({ id: crypto.randomUUID(), productId, url: videoUrl, kind: "video", sortOrder: 0 })
+  await db.insert(productMedia).values(mediaRows)
+
   revalidatePath("/admin")
+  revalidatePath("/admin/products")
   revalidatePath("/shop")
-  redirect("/admin")
+  redirect("/admin/products")
+}
+
+export async function updateProduct(formData: FormData) {
+  await requireAdminAction()
+
+  const productId = String(formData.get("id"))
+  if (!productId) throw new Error("Missing product id")
+
+  const data = parseProductFields(formData)
+  const newImages = validFiles(formData, "images")
+  const newVideo = validFiles(formData, "video")[0]
+  const removeIds = formData.getAll("removeMediaIds").map(String).filter(Boolean)
+
+  if (removeIds.length) {
+    await db.delete(productMedia).where(and(eq(productMedia.productId, productId), inArray(productMedia.id, removeIds)))
+  }
+
+  const existingImages = await db.select().from(productMedia).where(and(eq(productMedia.productId, productId), eq(productMedia.kind, "image"))).orderBy(asc(productMedia.sortOrder))
+  const nextSortOrder = existingImages.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1
+
+  const newImageUrls = await Promise.all(newImages.map((file) => uploadProductFile(file)))
+  const newVideoUrl = newVideo ? await uploadProductFile(newVideo) : null
+
+  const mediaRows = newImageUrls.map((url, index) => ({ id: crypto.randomUUID(), productId, url, kind: "image", sortOrder: nextSortOrder + index }))
+  if (newVideoUrl) mediaRows.push({ id: crypto.randomUUID(), productId, url: newVideoUrl, kind: "video", sortOrder: 0 })
+  if (mediaRows.length) await db.insert(productMedia).values(mediaRows)
+
+  if (existingImages.length === 0 && newImageUrls.length === 0) throw new Error("A product must keep at least one image")
+
+  const cover = existingImages[0] ?? (newImageUrls[0] ? { url: newImageUrls[0] } : null)
+
+  await db.update(products).set({
+    name: data.name,
+    brand: data.brand,
+    category: data.category,
+    gender: data.gender,
+    size: data.size,
+    condition: data.condition,
+    conditionNotes: data.conditionNotes,
+    price: data.price,
+    compareAtPrice: data.compareAtPrice,
+    color: data.color,
+    isFeatured: data.isFeatured ?? false,
+    stock: data.stock,
+    updatedAt: new Date(),
+    ...(cover ? { imageUrl: cover.url, imageAlt: data.name } : {}),
+  }).where(eq(products.id, productId))
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/products")
+  revalidatePath("/shop")
+  redirect("/admin/products")
 }

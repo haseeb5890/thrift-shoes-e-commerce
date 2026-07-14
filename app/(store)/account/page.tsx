@@ -1,0 +1,11 @@
+import { desc, eq } from "drizzle-orm"
+import { redirect } from "next/navigation"
+import Link from "next/link"
+import { createClient } from "@/lib/supabase/server"
+import { db } from "@/lib/db"
+import { orders } from "@/lib/db/schema"
+import { SignOutButton } from "@/components/sign-out-button"
+import { formatPKR } from "@/lib/store-data"
+import { isAdminUser } from "@/lib/auth-helpers"
+
+export default async function AccountPage(){const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)redirect("/sign-in");const isAdmin=isAdminUser(user);const items=await db.select().from(orders).where(eq(orders.userId,user.id)).orderBy(desc(orders.createdAt));return <section className="mx-auto max-w-5xl px-4 py-16 md:px-6"><p className="text-xs font-bold uppercase tracking-widest text-primary">Your account</p><h1 className="mt-2 font-serif text-5xl font-black">Salaam, {user.user_metadata?.name ?? user.email}.</h1><div className="mt-10 grid gap-8 md:grid-cols-[0.7fr_1.3fr]"><aside className="h-fit bg-secondary p-6"><p className="font-bold">{user.email}</p><p className="mt-2 text-sm text-muted-foreground">Saved delivery details and order history live here.</p><Link href="/track" className="mt-5 inline-block text-sm font-bold underline">Track a guest order</Link>{isAdmin&&<Link href="/admin" className="mt-3 block text-sm font-bold underline">Open admin dashboard</Link>}<SignOutButton className="mt-3 block text-sm font-bold underline"/></aside><div><h2 className="font-serif text-3xl font-black">Orders</h2>{items.length===0?<div className="mt-5 border border-border p-8 text-center"><p>No account orders yet.</p><p className="mt-2 text-sm text-muted-foreground">Guest orders can still be found from the tracking page.</p><Link href="/shop" className="mt-5 inline-block font-bold underline">Shop the latest drop</Link></div>:<div className="mt-5 flex flex-col gap-3">{items.map((order)=><div key={order.id} className="flex items-center justify-between border border-border p-4"><div><p className="font-bold">{order.orderNumber}</p><p className="text-xs capitalize text-muted-foreground">{order.status.replaceAll("_"," ")}</p></div><p className="font-bold">{formatPKR(order.total)}</p></div>)}</div>}</div></div></section>}
