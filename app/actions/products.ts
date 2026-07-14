@@ -5,7 +5,6 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { eq, and, asc, inArray } from "drizzle-orm"
 import { requireAdminAction } from "@/lib/auth-helpers"
-import { uploadProductFile } from "@/lib/supabase/storage-admin"
 import { db } from "@/lib/db"
 import { products, productMedia } from "@/lib/db/schema"
 
@@ -41,20 +40,17 @@ function parseProductFields(formData: FormData) {
   })
 }
 
-function validFiles(formData: FormData, field: string) {
-  return formData.getAll(field).filter((file): file is File => file instanceof File && file.size > 0)
+function mediaUrls(formData: FormData, field: string) {
+  return formData.getAll(field).map(String).filter((url) => url.startsWith("http"))
 }
 
 export async function createProduct(formData: FormData) {
   await requireAdminAction()
 
   const data = parseProductFields(formData)
-  const images = validFiles(formData, "images")
-  if (images.length === 0) throw new Error("At least one product image is required")
-  const video = validFiles(formData, "video")[0]
-
-  const imageUrls = await Promise.all(images.map((file) => uploadProductFile(file)))
-  const videoUrl = video ? await uploadProductFile(video) : null
+  const imageUrls = mediaUrls(formData, "imageUrls")
+  if (imageUrls.length === 0) throw new Error("At least one product image is required")
+  const videoUrl = mediaUrls(formData, "videoUrl")[0] ?? null
 
   const productId = crypto.randomUUID()
   const slug = `${data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Date.now().toString().slice(-5)}`
@@ -95,8 +91,8 @@ export async function updateProduct(formData: FormData) {
   if (!productId) throw new Error("Missing product id")
 
   const data = parseProductFields(formData)
-  const newImages = validFiles(formData, "images")
-  const newVideo = validFiles(formData, "video")[0]
+  const newImageUrls = mediaUrls(formData, "imageUrls")
+  const newVideoUrl = mediaUrls(formData, "videoUrl")[0] ?? null
   const removeIds = formData.getAll("removeMediaIds").map(String).filter(Boolean)
 
   if (removeIds.length) {
@@ -105,9 +101,6 @@ export async function updateProduct(formData: FormData) {
 
   const existingImages = await db.select().from(productMedia).where(and(eq(productMedia.productId, productId), eq(productMedia.kind, "image"))).orderBy(asc(productMedia.sortOrder))
   const nextSortOrder = existingImages.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1
-
-  const newImageUrls = await Promise.all(newImages.map((file) => uploadProductFile(file)))
-  const newVideoUrl = newVideo ? await uploadProductFile(newVideo) : null
 
   const mediaRows = newImageUrls.map((url, index) => ({ id: crypto.randomUUID(), productId, url, kind: "image", sortOrder: nextSortOrder + index }))
   if (newVideoUrl) mediaRows.push({ id: crypto.randomUUID(), productId, url: newVideoUrl, kind: "video", sortOrder: 0 })

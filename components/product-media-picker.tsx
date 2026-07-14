@@ -1,47 +1,96 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 
-export function ProductMediaPicker({ imagesRequired = true }: { imagesRequired?: boolean }) {
-  const [imagePreviews, setImagePreviews] = useState<string[]>([])
-  const [videoPreview, setVideoPreview] = useState<string | null>(null)
+const PRODUCT_MEDIA_BUCKET = "product-images"
 
-  useEffect(() => () => { imagePreviews.forEach((url) => URL.revokeObjectURL(url)); if (videoPreview) URL.revokeObjectURL(videoPreview) }, [imagePreviews, videoPreview])
+async function uploadToStorage(file: File) {
+  const supabase = createClient()
+  const extension = file.name.split(".").pop()
+  const path = `${crypto.randomUUID()}.${extension}`
+  const { error } = await supabase.storage.from(PRODUCT_MEDIA_BUCKET).upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw new Error(error.message)
+  const { data } = supabase.storage.from(PRODUCT_MEDIA_BUCKET).getPublicUrl(path)
+  return data.publicUrl
+}
 
-  function onImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    imagePreviews.forEach((url) => URL.revokeObjectURL(url))
+type MediaEntry = { previewUrl: string; publicUrl: string | null; error: string | null }
+
+export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { imagesRequired?: boolean; submitLabel: string }) {
+  const [images, setImages] = useState<MediaEntry[]>([])
+  const [video, setVideo] = useState<MediaEntry | null>(null)
+
+  async function onImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    images.forEach((img) => URL.revokeObjectURL(img.previewUrl))
     const files = Array.from(e.target.files ?? [])
-    setImagePreviews(files.map((file) => URL.createObjectURL(file)))
+    const next = files.map((file) => ({ previewUrl: URL.createObjectURL(file), publicUrl: null as string | null, error: null as string | null }))
+    setImages(next)
+    const results = await Promise.all(
+      files.map(async (file, index) => {
+        try {
+          return { ...next[index], publicUrl: await uploadToStorage(file) }
+        } catch (err) {
+          return { ...next[index], error: err instanceof Error ? err.message : "Upload failed" }
+        }
+      }),
+    )
+    setImages(results)
   }
 
-  function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (videoPreview) URL.revokeObjectURL(videoPreview)
+  async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (video) URL.revokeObjectURL(video.previewUrl)
     const file = e.target.files?.[0]
-    setVideoPreview(file ? URL.createObjectURL(file) : null)
+    if (!file) { setVideo(null); return }
+    const entry: MediaEntry = { previewUrl: URL.createObjectURL(file), publicUrl: null, error: null }
+    setVideo(entry)
+    try {
+      setVideo({ ...entry, publicUrl: await uploadToStorage(file) })
+    } catch (err) {
+      setVideo({ ...entry, error: err instanceof Error ? err.message : "Upload failed" })
+    }
   }
+
+  const readyImageCount = images.filter((img) => img.publicUrl).length
+  const stillUploading = images.some((img) => !img.publicUrl && !img.error) || Boolean(video && !video.publicUrl && !video.error)
+  const hasFailedUpload = images.some((img) => img.error) || Boolean(video?.error)
+  const canSubmit = !stillUploading && !hasFailedUpload && (!imagesRequired || readyImageCount > 0)
 
   return (
     <div className="flex flex-col gap-5">
       <div>
         <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product photos (multiple angles)</label>
-        <input type="file" name="images" accept="image/*" multiple required={imagesRequired} onChange={onImagesChange} className="mt-2 block w-full text-sm" />
-        {imagePreviews.length > 0 && (
+        <input type="file" accept="image/*" multiple onChange={onImagesChange} className="mt-2 block w-full text-sm" />
+        {images.length > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {imagePreviews.map((src, index) => (
-              <div key={src} className="relative aspect-square overflow-hidden border border-border bg-secondary">
-                <img src={src} alt={`Preview ${index + 1}`} className="size-full object-cover" />
+            {images.map((img, index) => (
+              <div key={img.previewUrl} className="relative aspect-square overflow-hidden border border-border bg-secondary">
+                <img src={img.previewUrl} alt={`Preview ${index + 1}`} className="size-full object-cover" />
+                {!img.publicUrl && !img.error && <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-[10px] font-bold uppercase">Uploading...</div>}
+                {img.error && <div className="absolute inset-0 flex items-center justify-center bg-destructive/80 p-1 text-center text-[9px] font-bold text-destructive-foreground">{img.error}</div>}
+                {img.publicUrl && <input type="hidden" name="imageUrls" value={img.publicUrl} />}
               </div>
             ))}
           </div>
         )}
+        {imagesRequired && images.length === 0 && <p className="mt-1 text-xs text-muted-foreground">At least one photo is required.</p>}
       </div>
       <div>
         <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product video (optional)</label>
-        <input type="file" name="video" accept="video/*" onChange={onVideoChange} className="mt-2 block w-full text-sm" />
-        {videoPreview && (
-          <video src={videoPreview} controls className="mt-3 max-h-64 w-full bg-secondary" />
+        <input type="file" accept="video/*" onChange={onVideoChange} className="mt-2 block w-full text-sm" />
+        {video && (
+          <div className="relative mt-3 max-w-xs">
+            <video src={video.previewUrl} controls className="w-full bg-secondary" />
+            {!video.publicUrl && !video.error && <p className="mt-1 text-xs font-bold uppercase text-muted-foreground">Uploading...</p>}
+            {video.error && <p className="mt-1 text-xs font-bold text-destructive">{video.error}</p>}
+            {video.publicUrl && <input type="hidden" name="videoUrl" value={video.publicUrl} />}
+          </div>
         )}
       </div>
+      {hasFailedUpload && <p className="text-sm font-bold text-destructive">Some files failed to upload — reselect them before submitting.</p>}
+      <button type="submit" disabled={!canSubmit} className="h-12 bg-primary font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+        {stillUploading ? "Uploading..." : submitLabel}
+      </button>
     </div>
   )
 }
