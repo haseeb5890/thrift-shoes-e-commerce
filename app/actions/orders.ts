@@ -12,8 +12,14 @@ import { ORDER_STATUSES } from "@/lib/order-status"
 const checkoutSchema = z.object({ customerName: z.string().min(2), email: z.email(), phone: z.string().regex(/^03\d{9}$/), city: z.string().min(2), addressLine: z.string().min(8), postalCode: z.string().optional(), paymentMethod: z.enum(["cod", "bank"]), notes: z.string().optional(), items: z.array(z.object({ id: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1), shippingFee: z.number().int().nonnegative() })
 
 export async function createOrder(input: z.infer<typeof checkoutSchema>): Promise<{ error: string } | { orderNumber: string; total: number; paymentMethod: "cod" | "bank" }> {
-  const data = checkoutSchema.parse(input)
-  const sessionUser = await getSessionUser()
+  let data: z.infer<typeof checkoutSchema>
+  try {
+    data = checkoutSchema.parse(input)
+  } catch {
+    return { error: "Please check your details. Use a Pakistan mobile number such as 03001234567." }
+  }
+
+  const sessionUser = await getSessionUser().catch(() => null)
   const id = crypto.randomUUID()
   const orderNumber = `RLP-${Date.now().toString().slice(-7)}`
   const subtotal = data.items.reduce((sum, item) => sum + item.price, 0)
@@ -46,7 +52,7 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
     if (err instanceof Error && err.message.startsWith("SOLD_OUT:")) {
       return { error: `${err.message.slice(9)} just sold out — remove it from your bag and try again.` }
     }
-    throw err
+    return { error: "We couldn't reach our servers to place your order. Please check your connection and try again in a moment." }
   }
 
   revalidatePath("/shop")

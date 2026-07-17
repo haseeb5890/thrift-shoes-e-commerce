@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { requireAdminPage } from "@/lib/auth-helpers"
 import { AdminNav } from "@/components/admin-nav"
+import { Logo } from "@/components/logo"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdminPage()
@@ -10,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-svh bg-secondary">
       <header className="border-b border-border bg-foreground text-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
-          <Link href="/" className="shrink-0 font-serif text-2xl font-black">ReLace.</Link>
+          <Logo href="/" variant="secondary" size="h-10" wrapperClassName="shrink-0"/>
           <div className="hidden truncate text-xs font-bold uppercase tracking-widest text-background/80 md:block">
             Store admin · {user.user_metadata?.name ?? user.email}
           </div>

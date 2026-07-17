@@ -26,7 +26,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
       <div className="flex flex-col justify-between gap-6 border-b border-border pb-8 md:flex-row md:items-end">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">One-of-one pairs</p>
-          <h1 className="mt-2 font-serif text-5xl font-black">
+          <h1 className="mt-2 text-5xl font-black">
             {filters.q ? `Results for "${filters.q}"` : filters.category ?? "Shop all shoes"}
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">

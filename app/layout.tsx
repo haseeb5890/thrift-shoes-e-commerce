@@ -7,7 +7,7 @@ import "./globals.css"
 const sans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" })
 const serif = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
 
-export const metadata: Metadata = { title: { default: "ReLace PK — Curated thrift sneakers", template: "%s | ReLace PK" }, description: "Shop professionally cleaned, honestly graded thrift sneakers with delivery across Pakistan.", keywords: ["thrift shoes Pakistan", "used sneakers Pakistan", "pre-owned shoes"] }
+export const metadata: Metadata = { title: { default: "Prime Soles — Curated thrift sneakers", template: "%s | Prime Soles" }, description: "Shop professionally cleaned, honestly graded thrift sneakers with delivery across Pakistan.", keywords: ["thrift shoes Pakistan", "used sneakers Pakistan", "pre-owned shoes"] }
 export const viewport: Viewport = { themeColor: "#f4f1e8", colorScheme: "light", width: "device-width", initialScale: 1 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,5 +1,6 @@
 const STEPS = [
   { key: "placed", label: "Pending" },
+  { key: "confirmed", label: "Confirmed" },
   { key: "processing", label: "Processing" },
   { key: "shipped", label: "Shipped" },
   { key: "delivered", label: "Delivered" },

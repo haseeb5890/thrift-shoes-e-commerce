@@ -21,6 +21,7 @@ const STATUS_FILTERS: { value: OrderStatusFilter; label: string }[] = [
 
 const BREAKDOWN_CARDS: { key: keyof OrderAnalytics["statusBreakdown"] | "returned"; label: string }[] = [
   { key: "placed", label: "Pending" },
+  { key: "confirmed", label: "Confirmed" },
   { key: "processing", label: "Processing" },
   { key: "shipped", label: "Shipped" },
   { key: "delivered", label: "Completed" },

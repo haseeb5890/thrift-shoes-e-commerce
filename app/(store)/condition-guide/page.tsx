@@ -73,7 +73,7 @@ export default function ConditionGuidePage() {
         One pair, one honest grade.
       </h1>
       <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground">
-        Every pair on ReLace goes through the same 30+ point inspection before it's listed. We don't use stock
+        Every pair on Prime Soles goes through the same 30+ point inspection before it's listed. We don't use stock
         photos or generic descriptions — the grade below, and the condition notes on each product page, describe
         the exact pair you'll receive.
       </p>

@@ -6,6 +6,7 @@ import { useState } from "react"
 import { useStore } from "@/components/store-provider"
 import { SearchBar } from "@/components/search-bar"
 import { AccountMenu, type AccountMenuUser } from "@/components/account-menu"
+import { Logo } from "@/components/logo"
 
 export function SiteHeader({ user, isAdmin }: { user: AccountMenuUser | null; isAdmin: boolean }) {
   const { cartCount, setCartOpen } = useStore()
@@ -15,7 +16,7 @@ export function SiteHeader({ user, isAdmin }: { user: AccountMenuUser | null; is
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
         <button className="md:hidden" onClick={() => setOpen(!open)} aria-label="Toggle menu">{open ? <X size={22}/> : <Menu size={22}/>}</button>
-        <Link href="/" className="font-serif text-2xl font-black tracking-tight">ReLace<span className="text-primary">.</span></Link>
+        <Logo size="h-16"/>
         <nav className="hidden items-center gap-7 text-sm font-semibold md:flex"><Link href="/shop">New drops</Link><Link href="/shop?category=Running">Running</Link><Link href="/shop?category=Court">Court</Link><Link href="/shop?category=Trail">Trail</Link><Link href="/about">Our process</Link></nav>
         <div className="flex items-center gap-4"><SearchBar/><AccountMenu user={user} isAdmin={isAdmin}/><button className="relative" onClick={() => setCartOpen(true)} aria-label={`Open cart with ${cartCount} items`}><ShoppingBag size={21}/><span className="absolute -right-2 -top-2 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{cartCount}</span></button></div>
       </div>
