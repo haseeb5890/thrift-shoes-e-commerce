@@ -3,22 +3,27 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { linkCurrentUserProfile } from "@/app/actions/profile-link"
 
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
-  const router=useRouter(); const [name,setName]=useState(""); const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [error,setError]=useState<string|null>(null); const [notice,setNotice]=useState<string|null>(null); const [loading,setLoading]=useState(false); const signup=mode==="sign-up"
+export function AuthForm({ mode, initialError }: { mode: "sign-in" | "sign-up"; initialError?: string }) {
+  const router=useRouter(); const [name,setName]=useState(""); const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [error,setError]=useState<string|null>(initialError ?? null); const [notice,setNotice]=useState<string|null>(null); const [loading,setLoading]=useState(false); const signup=mode==="sign-up"
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError(null); setNotice(null); setLoading(true)
     const supabase = createClient()
     if (signup) {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
-      setLoading(false)
-      if (error) { setError(error.message); return }
-      if (!data.session) { setNotice("Check your email to confirm your account, then sign in."); return }
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: `${window.location.origin}/auth/callback` } })
+      if (error) { setLoading(false); setError(error.message); return }
+      if (!data.session) { setLoading(false); setNotice("Check your email to confirm your account, then sign in."); return }
+      // Email confirmation is disabled on this project, so a session exists immediately —
+      // that means /auth/callback never runs, so we link the profile here instead.
+      await linkCurrentUserProfile()
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      setLoading(false)
-      if (error) { setError(error.message); return }
+      if (error) { setLoading(false); setError(error.message); return }
+      // Password sign-in never redirects through /auth/callback, so link explicitly here too.
+      await linkCurrentUserProfile()
     }
+    setLoading(false)
     router.push("/account"); router.refresh()
   }
   async function continueWithGoogle() {
