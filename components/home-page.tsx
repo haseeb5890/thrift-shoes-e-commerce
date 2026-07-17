@@ -5,7 +5,13 @@ import { formatPKR, type Product } from "@/lib/store-data"
 import { ProductCard } from "@/components/product-card"
 
 export function HomePage({ products }: { products: Product[] }) {
-  const lowestPrice = products.length ? Math.min(...products.map((product) => product.price)) : null
+  // 1. Safe fallback: Ensure products is always treated as an array
+  const safeProducts = Array.isArray(products) ? products : []
+
+  // 2. Safe calculation of the lowest price
+  const lowestPrice = safeProducts.length 
+    ? Math.min(...safeProducts.map((product) => product.price)) 
+    : null
 
   return <>
     <section className="relative overflow-hidden border-b border-border bg-background">
@@ -29,7 +35,20 @@ export function HomePage({ products }: { products: Product[] }) {
       </div>
     </section>
     <section className="border-y border-border"><div className="mx-auto grid max-w-7xl grid-cols-2 md:grid-cols-4">{[[BadgeCheck,"Honest grading"],[BrushCleaning,"Deep cleaned"],[PackageCheck,"One pair only"],[Truck,"Pakistan wide"]].map(([Icon,label],i)=><div key={label as string} className={`flex items-center gap-3 border-border px-4 py-5 text-sm font-bold ${i < 3 ? "md:border-r" : ""}`}><Icon size={20} className="text-primary"/>{label as string}</div>)}</div></section>
-    <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24"><div className="mb-9 flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Freshly added</p><h2 className="mt-2 text-balance font-serif text-4xl font-black md:text-5xl">The latest rotation</h2></div><Link href="/shop" className="hidden items-center gap-2 text-sm font-bold md:flex">View all <ArrowRight size={16}/></Link></div><div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4 md:gap-6">{products.slice(0,4).map((product)=><ProductCard key={product.id} product={product}/>)}</div></section>
+    <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24"><div className="mb-9 flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Freshly added</p><h2 className="mt-2 text-balance font-serif text-4xl font-black md:text-5xl">The latest rotation</h2></div><Link href="/shop" className="hidden items-center gap-2 text-sm font-bold md:flex">View all <ArrowRight size={16}/></Link></div>
+      {/* 3. Safe mapping over the safeProducts array */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4 md:gap-6">
+        {safeProducts.length > 0 ? (
+          safeProducts.slice(0, 4).map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))
+        ) : (
+          <div className="col-span-full py-8 text-center text-muted-foreground text-sm">
+            No products found in the catalog yet.
+          </div>
+        )}
+      </div>
+    </section>
     <section className="bg-primary text-primary-foreground"><div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 md:grid-cols-2 md:px-6 md:py-24"><div><p className="text-xs font-bold uppercase tracking-[0.2em]">The ReLace standard</p><h2 className="mt-4 text-balance font-serif text-5xl font-black leading-none">No mystery pairs. Every mark disclosed.</h2></div><div className="grid gap-7 sm:grid-cols-2"><div><span className="font-serif text-4xl font-black">01</span><h3 className="mt-3 font-bold">Inspect</h3><p className="mt-2 text-sm leading-6 text-primary-foreground/75">We check soles, stitching, lining, shape and authenticity before listing.</p></div><div><span className="font-serif text-4xl font-black">02</span><h3 className="mt-3 font-bold">Restore</h3><p className="mt-2 text-sm leading-6 text-primary-foreground/75">Every pair is deep-cleaned, deodorized and photographed as it is.</p></div></div></div></section>
   </>
 }

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { toast } from "sonner"
 import { createOrder } from "@/app/actions/orders"
 import { useStore } from "@/components/store-provider"
 import { cities, formatPKR, shippingRates } from "@/lib/store-data"
@@ -19,7 +20,27 @@ export function CheckoutForm() {
   const shipping = shippingRates[city] ?? shippingRates.Other
   async function submit(formData: FormData) {
     setLoading(true); setError("")
-    try { const order = await createOrder({ customerName: String(formData.get("name")), email: String(formData.get("email")), phone: String(formData.get("phone")), city, addressLine: String(formData.get("address")), postalCode: String(formData.get("postal") ?? ""), paymentMethod: payment, notes: String(formData.get("notes") ?? ""), shippingFee: shipping, items: cart.map(({id,name,size,price,imageUrl})=>({id,name,size,price,imageUrl})) }); if ("error" in order) { setError(order.error) } else { setResult(order); clearCart() } } catch { setError("Please check your details. Use a Pakistan mobile number such as 03001234567.") } finally { setLoading(false) }
+
+    const orderPromise = createOrder({ customerName: String(formData.get("name")), email: String(formData.get("email")), phone: String(formData.get("phone")), city, addressLine: String(formData.get("address")), postalCode: String(formData.get("postal") ?? ""), paymentMethod: payment, notes: String(formData.get("notes") ?? ""), shippingFee: shipping, items: cart.map(({id,name,size,price,imageUrl})=>({id,name,size,price,imageUrl})) }).then((order) => {
+      if ("error" in order) throw new Error(order.error)
+      return order
+    })
+
+    toast.promise(orderPromise, {
+      loading: "Processing your order...",
+      success: (order) => `Order ${order.orderNumber} placed — your pair is reserved.`,
+      error: (err) => (err instanceof Error ? err.message : "Please check your details and try again."),
+    })
+
+    try {
+      const order = await orderPromise
+      setResult(order)
+      clearCart()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Please check your details. Use a Pakistan mobile number such as 03001234567.")
+    } finally {
+      setLoading(false)
+    }
   }
   if (result) { const message = encodeURIComponent(`Assalam o Alaikum, I have placed ReLace order ${result.orderNumber} for ${formatPKR(result.total)} and selected bank transfer. Please share the confirmation steps.`); return <div className="mx-auto max-w-2xl px-4 py-20 text-center"><p className="text-xs font-bold uppercase tracking-widest text-primary">Order received</p><h1 className="mt-3 font-serif text-5xl font-black">Your pair is reserved.</h1><p className="mt-5 text-muted-foreground">Order <strong className="text-foreground">{result.orderNumber}</strong> · {formatPKR(result.total)}</p>{result.paymentMethod === "bank" && <a href={`https://wa.me/923001234567?text=${message}`} target="_blank" rel="noreferrer" className="mx-auto mt-8 flex h-12 w-fit items-center bg-accent px-6 font-bold text-accent-foreground">Confirm on WhatsApp</a>}<Link href="/track" className="mt-6 block text-sm font-bold underline">Track your order</Link></div> }
   if (!cart.length) return <div className="mx-auto max-w-xl px-4 py-24 text-center"><h1 className="font-serif text-4xl font-black">Nothing to check out yet.</h1><Link href="/shop" className="mt-6 inline-flex h-12 items-center bg-primary px-6 font-bold text-primary-foreground">Browse unique pairs</Link></div>
