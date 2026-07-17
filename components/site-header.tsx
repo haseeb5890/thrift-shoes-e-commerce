@@ -1,11 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { Menu, Search, ShoppingBag, UserRound, X } from "lucide-react"
+import { Menu, ShoppingBag, X } from "lucide-react"
 import { useState } from "react"
 import { useStore } from "@/components/store-provider"
+import { SearchBar } from "@/components/search-bar"
+import { AccountMenu, type AccountMenuUser } from "@/components/account-menu"
 
-export function SiteHeader() {
+export function SiteHeader({ user, isAdmin }: { user: AccountMenuUser | null; isAdmin: boolean }) {
   const { cartCount, setCartOpen } = useStore()
   const [open, setOpen] = useState(false)
   return <>
@@ -14,10 +16,10 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
         <button className="md:hidden" onClick={() => setOpen(!open)} aria-label="Toggle menu">{open ? <X size={22}/> : <Menu size={22}/>}</button>
         <Link href="/" className="font-serif text-2xl font-black tracking-tight">ReLace<span className="text-primary">.</span></Link>
-        <nav className="hidden items-center gap-7 text-sm font-semibold md:flex"><Link href="/shop">New drops</Link><Link href="/shop?category=Runners">Runners</Link><Link href="/shop?category=Court">Court</Link><Link href="/shop?category=Trail">Trail</Link><Link href="/about">Our process</Link></nav>
-        <div className="flex items-center gap-4"><Link href="/shop" aria-label="Search"><Search size={20}/></Link><Link href="/account" aria-label="Account" className="hidden sm:block"><UserRound size={20}/></Link><button className="relative" onClick={() => setCartOpen(true)} aria-label={`Open cart with ${cartCount} items`}><ShoppingBag size={21}/><span className="absolute -right-2 -top-2 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{cartCount}</span></button></div>
+        <nav className="hidden items-center gap-7 text-sm font-semibold md:flex"><Link href="/shop">New drops</Link><Link href="/shop?category=Running">Running</Link><Link href="/shop?category=Court">Court</Link><Link href="/shop?category=Trail">Trail</Link><Link href="/about">Our process</Link></nav>
+        <div className="flex items-center gap-4"><SearchBar/><AccountMenu user={user} isAdmin={isAdmin}/><button className="relative" onClick={() => setCartOpen(true)} aria-label={`Open cart with ${cartCount} items`}><ShoppingBag size={21}/><span className="absolute -right-2 -top-2 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{cartCount}</span></button></div>
       </div>
-      {open && <nav className="flex flex-col gap-4 border-t border-border px-4 py-5 text-sm font-semibold md:hidden"><Link href="/shop">Shop all</Link><Link href="/shop?category=Runners">Runners</Link><Link href="/shop?category=Court">Court</Link><Link href="/about">Our process</Link><Link href="/account">Account</Link></nav>}
+      {open && <nav className="flex flex-col gap-4 border-t border-border px-4 py-5 text-sm font-semibold md:hidden"><Link href="/shop">Shop all</Link><Link href="/shop?category=Running">Running</Link><Link href="/shop?category=Trail">Trail</Link><Link href="/about">Our process</Link><Link href="/account">Account</Link></nav>}
     </header>
   </>
 }

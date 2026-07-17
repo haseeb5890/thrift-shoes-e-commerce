@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation"
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { createClient } from "@/lib/supabase/server"
 import { AuthForm } from "@/components/auth-form"
-export default async function SignUpPage(){const session=await auth.api.getSession({headers:await headers()});if(session?.user)redirect("/account");return <AuthForm mode="sign-up"/>}
+export default async function SignUpPage(){const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(user)redirect("/account");return <AuthForm mode="sign-up"/>}

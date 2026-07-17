@@ -1,0 +1,8 @@
+allowBuilds:
+  esbuild: true
+  msw: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - '@supabase/ssr@0.12.1'
+overrides:
+  hono: 4.12.25

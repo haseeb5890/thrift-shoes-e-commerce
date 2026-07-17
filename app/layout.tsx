@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { DM_Sans, Playfair_Display } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 const sans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" })
@@ -10,5 +11,19 @@ export const metadata: Metadata = { title: { default: "ReLace PK — Curated thr
 export const viewport: Viewport = { themeColor: "#f4f1e8", colorScheme: "light", width: "device-width", initialScale: 1 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className="bg-background"><body className={`${sans.variable} ${serif.variable} font-sans antialiased`}>{children}{process.env.NODE_ENV === "production" && <Analytics />}</body></html>
+  return (
+    <html lang="en" className="bg-background">
+      <body className={`${sans.variable} ${serif.variable} font-sans antialiased`}>
+        {children}
+        <Toaster
+          position="top-center"
+          richColors
+          toastOptions={{
+            style: { fontFamily: "var(--font-dm-sans)" },
+          }}
+        />
+        {process.env.NODE_ENV === "production" && <Analytics />}
+      </body>
+    </html>
+  )
 }
