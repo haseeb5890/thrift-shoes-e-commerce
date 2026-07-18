@@ -9,6 +9,7 @@ import { getSessionUser, getSessionProfile, requireAdminAction } from "@/lib/aut
 import { getOrCreateProfile } from "@/lib/profiles"
 import { ORDER_STATUSES } from "@/lib/order-status"
 import { sendOrderConfirmationEmail } from "@/lib/email"
+import { notifyNewOrder, notifyOrderConfirmed } from "@/lib/slack"
 
 const CONFIRMATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
@@ -72,6 +73,15 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
     shippingFee: data.shippingFee,
     total: subtotal + data.shippingFee,
     confirmationToken,
+  })
+
+  await notifyNewOrder({
+    orderNumber,
+    customerName: data.customerName,
+    city: data.city,
+    total: subtotal + data.shippingFee,
+    paymentMethod: data.paymentMethod,
+    items: data.items.map((item) => ({ name: item.name, size: item.size, imageUrl: item.imageUrl })),
   })
 
   return { orderNumber, total: subtotal + data.shippingFee, paymentMethod: data.paymentMethod }
@@ -167,7 +177,10 @@ export async function updateOrderStatus(
   await requireAdminAction()
   if (!ORDER_STATUSES.includes(status)) throw new Error("Invalid status")
 
-  const [existing] = await db.select({ status: orders.status, trackingNumber: orders.trackingNumber }).from(orders).where(eq(orders.id, orderId))
+  const [existing] = await db
+    .select({ status: orders.status, trackingNumber: orders.trackingNumber, orderNumber: orders.orderNumber, customerName: orders.customerName })
+    .from(orders)
+    .where(eq(orders.id, orderId))
   if (!existing) throw new Error("Order not found")
 
   // Cancelled is terminal — stock has already been reverted, so allowing a further
@@ -198,6 +211,10 @@ export async function updateOrderStatus(
       }
     }
   })
+
+  if (status === "confirmed" && existing.status !== "confirmed") {
+    await notifyOrderConfirmed({ orderNumber: existing.orderNumber, customerName: existing.customerName, via: "admin" })
+  }
 
   revalidatePath("/admin")
   revalidatePath("/admin/orders")

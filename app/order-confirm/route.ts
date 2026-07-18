@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { orders } from "@/lib/db/schema"
+import { notifyOrderConfirmed } from "@/lib/slack"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
   if (!token) return NextResponse.redirect(`${origin}/order-confirm/error?reason=invalid`)
 
   const [order] = await db
-    .select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status, confirmationExpiresAt: orders.confirmationExpiresAt })
+    .select({ id: orders.id, orderNumber: orders.orderNumber, customerName: orders.customerName, status: orders.status, confirmationExpiresAt: orders.confirmationExpiresAt })
     .from(orders)
     .where(eq(orders.confirmationToken, token))
 
@@ -30,6 +31,8 @@ export async function GET(request: Request) {
     .returning({ orderNumber: orders.orderNumber })
 
   if (!updated) return NextResponse.redirect(`${origin}/order-confirm/error?reason=already-handled&order=${order.orderNumber}`)
+
+  await notifyOrderConfirmed({ orderNumber: updated.orderNumber, customerName: order.customerName, via: "customer" })
 
   revalidatePath("/admin/orders")
   revalidatePath("/track")
