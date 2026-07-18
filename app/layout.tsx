@@ -1,14 +1,29 @@
 import type { Metadata, Viewport } from "next"
 import { DM_Sans, Playfair_Display } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 const sans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" })
 const serif = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
 
-export const metadata: Metadata = { title: { default: "ReLace PK — Curated thrift sneakers", template: "%s | ReLace PK" }, description: "Shop professionally cleaned, honestly graded thrift sneakers with delivery across Pakistan.", keywords: ["thrift shoes Pakistan", "used sneakers Pakistan", "pre-owned shoes"] }
+export const metadata: Metadata = { title: { default: "Prime Soles — Curated thrift sneakers", template: "%s | Prime Soles" }, description: "Shop professionally cleaned, honestly graded thrift sneakers with delivery across Pakistan.", keywords: ["thrift shoes Pakistan", "used sneakers Pakistan", "pre-owned shoes"] }
 export const viewport: Viewport = { themeColor: "#f4f1e8", colorScheme: "light", width: "device-width", initialScale: 1 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className="bg-background"><body className={`${sans.variable} ${serif.variable} font-sans antialiased`}>{children}{process.env.NODE_ENV === "production" && <Analytics />}</body></html>
+  return (
+    <html lang="en" className="bg-background">
+      <body className={`${sans.variable} ${serif.variable} font-sans antialiased`}>
+        {children}
+        <Toaster
+          position="top-center"
+          richColors
+          toastOptions={{
+            style: { fontFamily: "var(--font-dm-sans)" },
+          }}
+        />
+        {process.env.NODE_ENV === "production" && <Analytics />}
+      </body>
+    </html>
+  )
 }
