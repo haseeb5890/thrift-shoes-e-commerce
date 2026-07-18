@@ -8,12 +8,12 @@ import { orderItems, orders, products } from "@/lib/db/schema"
 import { getSessionUser, getSessionProfile, requireAdminAction } from "@/lib/auth-helpers"
 import { getOrCreateProfile } from "@/lib/profiles"
 import { ORDER_STATUSES } from "@/lib/order-status"
-import { sendOrderConfirmationEmail } from "@/lib/email"
+import { sendOrderConfirmationEmail, sendOrderConfirmedEmail, sendOrderCancelledEmail } from "@/lib/email"
 import { notifyNewOrder, notifyOrderConfirmed } from "@/lib/slack"
 
 const CONFIRMATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
-const checkoutSchema = z.object({ customerName: z.string().min(2), email: z.email(), phone: z.string().regex(/^03\d{9}$/), city: z.string().min(2), addressLine: z.string().min(8), postalCode: z.string().optional(), paymentMethod: z.enum(["cod", "bank"]), notes: z.string().optional(), items: z.array(z.object({ id: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1), shippingFee: z.number().int().nonnegative() })
+const checkoutSchema = z.object({ customerName: z.string().min(2), email: z.email(), phone: z.string().regex(/^03\d{9}$/), city: z.string().min(2), addressLine: z.string().min(8), postalCode: z.string().optional(), paymentMethod: z.enum(["cod", "bank"]), notes: z.string().optional(), items: z.array(z.object({ id: z.string(), slug: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1), shippingFee: z.number().int().nonnegative() })
 
 export async function createOrder(input: z.infer<typeof checkoutSchema>): Promise<{ error: string } | { orderNumber: string; total: number; paymentMethod: "cod" | "bank" }> {
   let data: z.infer<typeof checkoutSchema>
@@ -52,7 +52,7 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
         if (!claimed) throw new Error(`SOLD_OUT:${item.name} (${item.size})`)
       }
       await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: "pending", status: "placed", isNew: true, subtotal, shippingFee: data.shippingFee, total: subtotal + data.shippingFee, notes: data.notes, confirmationToken, confirmationExpiresAt })
-      await tx.insert(orderItems).values(data.items.map((item) => ({ id: crypto.randomUUID(), orderId: id, productId: item.id, productName: item.name, size: item.size, quantity: 1, unitPrice: item.price, imageUrl: item.imageUrl })))
+      await tx.insert(orderItems).values(data.items.map((item) => ({ id: crypto.randomUUID(), orderId: id, productId: item.id, productSlug: item.slug, productName: item.name, size: item.size, quantity: 1, unitPrice: item.price, imageUrl: item.imageUrl })))
     })
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("SOLD_OUT:")) {
@@ -81,7 +81,7 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
     city: data.city,
     total: subtotal + data.shippingFee,
     paymentMethod: data.paymentMethod,
-    items: data.items.map((item) => ({ name: item.name, size: item.size, imageUrl: item.imageUrl })),
+    items: data.items.map((item) => ({ slug: item.slug, name: item.name, size: item.size, imageUrl: item.imageUrl })),
   })
 
   return { orderNumber, total: subtotal + data.shippingFee, paymentMethod: data.paymentMethod }
@@ -103,7 +103,10 @@ export async function cancelOrderAsCustomer(orderId: string): Promise<{ error: s
   const profile = await getSessionProfile()
   if (!profile) return { error: "You must be signed in to cancel an order." }
 
-  const [order] = await db.select({ id: orders.id, userId: orders.userId, status: orders.status, createdAt: orders.createdAt }).from(orders).where(eq(orders.id, orderId))
+  const [order] = await db
+    .select({ id: orders.id, userId: orders.userId, status: orders.status, createdAt: orders.createdAt, orderNumber: orders.orderNumber, customerName: orders.customerName, email: orders.email })
+    .from(orders)
+    .where(eq(orders.id, orderId))
   if (!order) return { error: "Order not found." }
 
   // Ownership check — never let a customer touch an order that isn't theirs, regardless of status/timing.
@@ -136,6 +139,8 @@ export async function cancelOrderAsCustomer(orderId: string): Promise<{ error: s
     }
     throw err
   }
+
+  await sendOrderCancelledEmail({ to: order.email, customerName: order.customerName, orderNumber: order.orderNumber })
 
   revalidatePath("/track")
   revalidatePath("/admin/orders")
@@ -178,7 +183,16 @@ export async function updateOrderStatus(
   if (!ORDER_STATUSES.includes(status)) throw new Error("Invalid status")
 
   const [existing] = await db
-    .select({ status: orders.status, trackingNumber: orders.trackingNumber, orderNumber: orders.orderNumber, customerName: orders.customerName })
+    .select({
+      status: orders.status,
+      trackingNumber: orders.trackingNumber,
+      orderNumber: orders.orderNumber,
+      customerName: orders.customerName,
+      email: orders.email,
+      subtotal: orders.subtotal,
+      shippingFee: orders.shippingFee,
+      total: orders.total,
+    })
     .from(orders)
     .where(eq(orders.id, orderId))
   if (!existing) throw new Error("Order not found")
@@ -213,7 +227,24 @@ export async function updateOrderStatus(
   })
 
   if (status === "confirmed" && existing.status !== "confirmed") {
-    await notifyOrderConfirmed({ orderNumber: existing.orderNumber, customerName: existing.customerName, via: "admin" })
+    const confirmedItems = await db
+      .select({ slug: orderItems.productSlug, name: orderItems.productName, size: orderItems.size, imageUrl: orderItems.imageUrl, unitPrice: orderItems.unitPrice })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId))
+    await notifyOrderConfirmed({ orderNumber: existing.orderNumber, customerName: existing.customerName, via: "admin", items: confirmedItems })
+    await sendOrderConfirmedEmail({
+      to: existing.email,
+      customerName: existing.customerName,
+      orderNumber: existing.orderNumber,
+      items: confirmedItems.map((item) => ({ name: item.name, size: item.size, price: item.unitPrice, imageUrl: item.imageUrl })),
+      subtotal: existing.subtotal,
+      shippingFee: existing.shippingFee,
+      total: existing.total,
+    })
+  }
+
+  if (status === "cancelled" && existing.status !== "cancelled") {
+    await sendOrderCancelledEmail({ to: existing.email, customerName: existing.customerName, orderNumber: existing.orderNumber })
   }
 
   revalidatePath("/admin")

@@ -22,21 +22,10 @@ function absoluteImageUrl(url: string) {
   return url.startsWith("http") ? url : `${SITE_URL}${url}`
 }
 
-type OrderConfirmationItem = { name: string; size: string; price: number; imageUrl: string }
+type OrderEmailItem = { name: string; size: string; price: number; imageUrl: string }
 
-export async function sendOrderConfirmationEmail(params: {
-  to: string
-  customerName: string
-  orderNumber: string
-  items: OrderConfirmationItem[]
-  subtotal: number
-  shippingFee: number
-  total: number
-  confirmationToken: string
-}) {
-  const confirmUrl = `${SITE_URL}/order-confirm?token=${params.confirmationToken}`
-
-  const itemRows = params.items
+function itemRowsHtml(items: OrderEmailItem[]) {
+  return items
     .map(
       (item) => `
         <tr>
@@ -53,8 +42,31 @@ export async function sendOrderConfirmationEmail(params: {
         </tr>`
     )
     .join("")
+}
 
-  const html = `
+function totalsHtml(params: { subtotal: number; shippingFee: number; total: number }) {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family: ${BODY_FONT}; font-size: 13px; color: ${COLORS.foreground};">
+      <tr>
+        <td style="padding: 4px 0; color: ${COLORS.muted};">Subtotal</td>
+        <td style="padding: 4px 0; text-align: right;">${formatPKR(params.subtotal)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 0; color: ${COLORS.muted};">Shipping</td>
+        <td style="padding: 4px 0; text-align: right;">${formatPKR(params.shippingFee)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 0 0; font-weight: 700; font-size: 16px; border-top: 1px solid ${COLORS.border};">Total</td>
+        <td style="padding: 10px 0 0; font-weight: 700; font-size: 16px; text-align: right; border-top: 1px solid ${COLORS.border};">${formatPKR(params.total)}</td>
+      </tr>
+    </table>`
+}
+
+// Shared chrome (logo/ribbon header + dark footer) around a per-email body block, so each
+// transactional email (confirm-request, confirmed, cancelled) stays visually consistent with
+// the site's actual branding instead of drifting into generic-receipt styling over time.
+function wrapEmail(title: string, bodyHtml: string) {
+  return `
 <!doctype html>
 <html>
   <head>
@@ -62,7 +74,7 @@ export async function sendOrderConfirmationEmail(params: {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
-    <title>Confirm your order</title>
+    <title>${title}</title>
   </head>
   <body style="margin: 0; padding: 0; background-color: ${COLORS.background};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${COLORS.background}; padding: 32px 16px;">
@@ -81,56 +93,7 @@ export async function sendOrderConfirmationEmail(params: {
                 </span>
               </td>
             </tr>
-            <tr>
-              <td style="padding: 32px 32px 8px;">
-                <p style="margin: 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;">Order ${params.orderNumber}</p>
-                <h1 style="margin: 6px 0 0; font-family: ${HEADING_FONT}; color: ${COLORS.foreground}; font-size: 28px; font-weight: 700;">Hi ${params.customerName}, confirm your order.</h1>
-                <p style="margin: 12px 0 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 14px; line-height: 20px;">
-                  Thanks for shopping with us. Click below to confirm this order so we can get your pair ready.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 16px 32px 0;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  ${itemRows}
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 16px 32px 0;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family: ${BODY_FONT}; font-size: 13px; color: ${COLORS.foreground};">
-                  <tr>
-                    <td style="padding: 4px 0; color: ${COLORS.muted};">Subtotal</td>
-                    <td style="padding: 4px 0; text-align: right;">${formatPKR(params.subtotal)}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 4px 0; color: ${COLORS.muted};">Shipping</td>
-                    <td style="padding: 4px 0; text-align: right;">${formatPKR(params.shippingFee)}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0 0; font-weight: 700; font-size: 16px; border-top: 1px solid ${COLORS.border};">Total</td>
-                    <td style="padding: 10px 0 0; font-weight: 700; font-size: 16px; text-align: right; border-top: 1px solid ${COLORS.border};">${formatPKR(params.total)}</td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding: 28px 32px 8px;">
-                <a href="${confirmUrl}" style="display: inline-block; background-color: ${COLORS.primary}; color: ${COLORS.primaryForeground}; font-family: ${BODY_FONT}; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; padding: 14px 28px;">
-                  Confirm my order
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 32px 32px;">
-                <p style="margin: 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 11px; line-height: 16px; text-align: center;">
-                  If the button doesn't work, paste this link into your browser:<br />
-                  <a href="${confirmUrl}" style="color: ${COLORS.primary};">${confirmUrl}</a><br />
-                  This link expires in 7 days. Didn't place this order? You can ignore this email.
-                </p>
-              </td>
-            </tr>
+            ${bodyHtml}
             <tr>
               <td style="background-color: ${COLORS.foreground}; padding: 24px 32px;">
                 <p style="margin: 0; font-family: ${BODY_FONT}; color: ${COLORS.background}; font-size: 12px; line-height: 18px;">
@@ -151,15 +114,109 @@ export async function sendOrderConfirmationEmail(params: {
   </body>
 </html>
 `
+}
 
+function ctaButtonHtml(href: string, label: string) {
+  return `
+    <tr>
+      <td align="center" style="padding: 28px 32px 8px;">
+        <a href="${href}" style="display: inline-block; background-color: ${COLORS.primary}; color: ${COLORS.primaryForeground}; font-family: ${BODY_FONT}; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; padding: 14px 28px;">
+          ${label}
+        </a>
+      </td>
+    </tr>`
+}
+
+async function dispatch(to: string, subject: string, html: string, failureMessage: string) {
   try {
-    await resend.emails.send({
-      from: "Confirmation <" + FROM + ">",
-      to: params.to,
-      subject: `Confirm your order ${params.orderNumber}`,
-      html,
-    })
+    await resend.emails.send({ from: FROM, to, subject, html })
   } catch (err) {
-    console.error("Failed to send order confirmation email", err)
+    console.error(failureMessage, err)
   }
+}
+
+export async function sendOrderConfirmationEmail(params: {
+  to: string
+  customerName: string
+  orderNumber: string
+  items: OrderEmailItem[]
+  subtotal: number
+  shippingFee: number
+  total: number
+  confirmationToken: string
+}) {
+  const confirmUrl = `${SITE_URL}/order-confirm?token=${params.confirmationToken}`
+
+  const body = `
+    <tr>
+      <td style="padding: 32px 32px 8px;">
+        <p style="margin: 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;">Order ${params.orderNumber}</p>
+        <h1 style="margin: 6px 0 0; font-family: ${HEADING_FONT}; color: ${COLORS.foreground}; font-size: 28px; font-weight: 700;">Hi ${params.customerName}, confirm your order.</h1>
+        <p style="margin: 12px 0 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 14px; line-height: 20px;">
+          Thanks for shopping with us. Click below to confirm this order so we can get your pair ready.
+        </p>
+      </td>
+    </tr>
+    <tr><td style="padding: 16px 32px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${itemRowsHtml(params.items)}</table></td></tr>
+    <tr><td style="padding: 16px 32px 0;">${totalsHtml(params)}</td></tr>
+    ${ctaButtonHtml(confirmUrl, "Confirm my order")}
+    <tr>
+      <td style="padding: 8px 32px 32px;">
+        <p style="margin: 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 11px; line-height: 16px; text-align: center;">
+          If the button doesn't work, paste this link into your browser:<br />
+          <a href="${confirmUrl}" style="color: ${COLORS.primary};">${confirmUrl}</a><br />
+          This link expires in 7 days. Didn't place this order? You can ignore this email.
+        </p>
+      </td>
+    </tr>`
+
+  await dispatch(params.to, `Confirm your order ${params.orderNumber}`, wrapEmail("Confirm your order", body), "Failed to send order confirmation email")
+}
+
+export async function sendOrderConfirmedEmail(params: {
+  to: string
+  customerName: string
+  orderNumber: string
+  items: OrderEmailItem[]
+  subtotal: number
+  shippingFee: number
+  total: number
+}) {
+  const trackUrl = `${SITE_URL}/track`
+
+  const body = `
+    <tr>
+      <td style="padding: 32px 32px 8px;">
+        <p style="margin: 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;">Order ${params.orderNumber}</p>
+        <h1 style="margin: 6px 0 0; font-family: ${HEADING_FONT}; color: ${COLORS.foreground}; font-size: 28px; font-weight: 700;">Hi ${params.customerName}, your order is confirmed.</h1>
+        <p style="margin: 12px 0 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 14px; line-height: 20px;">
+          We're getting your pair ready. You can follow its progress any time.
+        </p>
+      </td>
+    </tr>
+    <tr><td style="padding: 16px 32px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${itemRowsHtml(params.items)}</table></td></tr>
+    <tr><td style="padding: 16px 32px 0;">${totalsHtml(params)}</td></tr>
+    ${ctaButtonHtml(trackUrl, "Track my order")}
+    <tr><td style="padding: 8px 32px 32px;"></td></tr>`
+
+  await dispatch(params.to, `Order confirmed — ${params.orderNumber}`, wrapEmail("Order confirmed", body), "Failed to send order confirmed email")
+}
+
+export async function sendOrderCancelledEmail(params: { to: string; customerName: string; orderNumber: string }) {
+  const shopUrl = `${SITE_URL}/shop`
+
+  const body = `
+    <tr>
+      <td style="padding: 32px 32px 8px;">
+        <p style="margin: 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;">Order ${params.orderNumber}</p>
+        <h1 style="margin: 6px 0 0; font-family: ${HEADING_FONT}; color: ${COLORS.foreground}; font-size: 28px; font-weight: 700;">Hi ${params.customerName}, your order has been cancelled.</h1>
+        <p style="margin: 12px 0 0; font-family: ${BODY_FONT}; color: ${COLORS.muted}; font-size: 14px; line-height: 20px;">
+          Order ${params.orderNumber} has been cancelled and won't be shipped. If this wasn't you or you have questions, just reply to this email or reach us on WhatsApp.
+        </p>
+      </td>
+    </tr>
+    ${ctaButtonHtml(shopUrl, "Shop other pairs")}
+    <tr><td style="padding: 8px 32px 32px;"></td></tr>`
+
+  await dispatch(params.to, `Order cancelled — ${params.orderNumber}`, wrapEmail("Order cancelled", body), "Failed to send order cancelled email")
 }

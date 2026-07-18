@@ -2,8 +2,9 @@ import { NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { orders } from "@/lib/db/schema"
+import { orderItems, orders } from "@/lib/db/schema"
 import { notifyOrderConfirmed } from "@/lib/slack"
+import { sendOrderConfirmedEmail } from "@/lib/email"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -12,7 +13,17 @@ export async function GET(request: Request) {
   if (!token) return NextResponse.redirect(`${origin}/order-confirm/error?reason=invalid`)
 
   const [order] = await db
-    .select({ id: orders.id, orderNumber: orders.orderNumber, customerName: orders.customerName, status: orders.status, confirmationExpiresAt: orders.confirmationExpiresAt })
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      customerName: orders.customerName,
+      email: orders.email,
+      status: orders.status,
+      confirmationExpiresAt: orders.confirmationExpiresAt,
+      subtotal: orders.subtotal,
+      shippingFee: orders.shippingFee,
+      total: orders.total,
+    })
     .from(orders)
     .where(eq(orders.confirmationToken, token))
 
@@ -32,7 +43,20 @@ export async function GET(request: Request) {
 
   if (!updated) return NextResponse.redirect(`${origin}/order-confirm/error?reason=already-handled&order=${order.orderNumber}`)
 
-  await notifyOrderConfirmed({ orderNumber: updated.orderNumber, customerName: order.customerName, via: "customer" })
+  const confirmedItems = await db
+    .select({ slug: orderItems.productSlug, name: orderItems.productName, size: orderItems.size, imageUrl: orderItems.imageUrl, unitPrice: orderItems.unitPrice })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id))
+  await notifyOrderConfirmed({ orderNumber: updated.orderNumber, customerName: order.customerName, via: "customer", items: confirmedItems })
+  await sendOrderConfirmedEmail({
+    to: order.email,
+    customerName: order.customerName,
+    orderNumber: updated.orderNumber,
+    items: confirmedItems.map((item) => ({ name: item.name, size: item.size, price: item.unitPrice, imageUrl: item.imageUrl })),
+    subtotal: order.subtotal,
+    shippingFee: order.shippingFee,
+    total: order.total,
+  })
 
   revalidatePath("/admin/orders")
   revalidatePath("/track")

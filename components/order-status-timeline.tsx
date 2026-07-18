@@ -9,7 +9,7 @@ const STEPS = [
 export function OrderStatusTimeline({ status, className = "" }: { status: string; className?: string }) {
   if (status === "cancelled") {
     return (
-      <div className={`border border-destructive px-4 py-3 text-xs font-bold uppercase tracking-wider text-destructive ${className}`}>
+      <div className={`border border-destructive px-4 py-3 text-xs text-red font-bold uppercase tracking-wider text-destructive ${className}`}>
         Order cancelled
       </div>
     )

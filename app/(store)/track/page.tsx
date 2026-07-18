@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { getSessionProfile } from "@/lib/auth-helpers"
 import { getOrdersForProfile } from "@/app/actions/tracking"
 import { TrackForm } from "@/components/track-form"
@@ -29,7 +30,7 @@ export default async function TrackPage() {
           {myOrders.map((order) => (
             <div key={order.id} className="bg-secondary p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-primary">{order.orderNumber}</p>
+                <Link href={`/track/${order.id}`} className="text-xs font-bold uppercase tracking-widest text-primary underline">{order.orderNumber}</Link>
                 <p className="text-sm font-bold">{formatPKR(order.total)}</p>
               </div>
 
@@ -50,7 +51,7 @@ export default async function TrackPage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Placed</p>
-                  <p className="font-bold">{new Date(order.createdAt).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" })}</p>
+                  <p className="font-bold">{new Date(order.createdAt).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Karachi" })}</p>
                 </div>
               </div>
 
