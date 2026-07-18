@@ -8,6 +8,9 @@ import { orderItems, orders, products } from "@/lib/db/schema"
 import { getSessionUser, getSessionProfile, requireAdminAction } from "@/lib/auth-helpers"
 import { getOrCreateProfile } from "@/lib/profiles"
 import { ORDER_STATUSES } from "@/lib/order-status"
+import { sendOrderConfirmationEmail } from "@/lib/email"
+
+const CONFIRMATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 const checkoutSchema = z.object({ customerName: z.string().min(2), email: z.email(), phone: z.string().regex(/^03\d{9}$/), city: z.string().min(2), addressLine: z.string().min(8), postalCode: z.string().optional(), paymentMethod: z.enum(["cod", "bank"]), notes: z.string().optional(), items: z.array(z.object({ id: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1), shippingFee: z.number().int().nonnegative() })
 
@@ -23,6 +26,8 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
   const id = crypto.randomUUID()
   const orderNumber = `RLP-${Date.now().toString().slice(-7)}`
   const subtotal = data.items.reduce((sum, item) => sum + item.price, 0)
+  const confirmationToken = crypto.randomUUID()
+  const confirmationExpiresAt = new Date(Date.now() + CONFIRMATION_TOKEN_TTL_MS)
 
   try {
     await db.transaction(async (tx) => {
@@ -45,7 +50,7 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
           .returning({ id: products.id })
         if (!claimed) throw new Error(`SOLD_OUT:${item.name} (${item.size})`)
       }
-      await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: "pending", status: "placed", isNew: true, subtotal, shippingFee: data.shippingFee, total: subtotal + data.shippingFee, notes: data.notes })
+      await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: "pending", status: "placed", isNew: true, subtotal, shippingFee: data.shippingFee, total: subtotal + data.shippingFee, notes: data.notes, confirmationToken, confirmationExpiresAt })
       await tx.insert(orderItems).values(data.items.map((item) => ({ id: crypto.randomUUID(), orderId: id, productId: item.id, productName: item.name, size: item.size, quantity: 1, unitPrice: item.price, imageUrl: item.imageUrl })))
     })
   } catch (err) {
@@ -57,6 +62,18 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
 
   revalidatePath("/shop")
   revalidatePath("/admin/orders")
+
+  await sendOrderConfirmationEmail({
+    to: data.email,
+    customerName: data.customerName,
+    orderNumber,
+    items: data.items.map((item) => ({ name: item.name, size: item.size, price: item.price, imageUrl: item.imageUrl })),
+    subtotal,
+    shippingFee: data.shippingFee,
+    total: subtotal + data.shippingFee,
+    confirmationToken,
+  })
+
   return { orderNumber, total: subtotal + data.shippingFee, paymentMethod: data.paymentMethod }
 }
 
@@ -116,15 +133,60 @@ export async function cancelOrderAsCustomer(orderId: string): Promise<{ error: s
   return { success: true }
 }
 
-export async function updateOrderStatus(orderId: string, status: (typeof ORDER_STATUSES)[number]) {
+export async function resendOrderConfirmationEmail(orderId: string): Promise<{ error: string } | { success: true }> {
+  await requireAdminAction()
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+  if (!order) return { error: "Order not found." }
+  if (order.status !== "placed") return { error: "Only orders awaiting confirmation can have their confirmation email resent." }
+
+  const confirmationToken = crypto.randomUUID()
+  const confirmationExpiresAt = new Date(Date.now() + CONFIRMATION_TOKEN_TTL_MS)
+  await db.update(orders).set({ confirmationToken, confirmationExpiresAt, updatedAt: new Date() }).where(eq(orders.id, orderId))
+
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId))
+  await sendOrderConfirmationEmail({
+    to: order.email,
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    items: items.map((item) => ({ name: item.productName, size: item.size, price: item.unitPrice, imageUrl: item.imageUrl })),
+    subtotal: order.subtotal,
+    shippingFee: order.shippingFee,
+    total: order.total,
+    confirmationToken,
+  })
+
+  return { success: true }
+}
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: (typeof ORDER_STATUSES)[number],
+  opts?: { trackingNumber?: string; cancelPin?: string }
+): Promise<{ error: string } | { success: true }> {
   await requireAdminAction()
   if (!ORDER_STATUSES.includes(status)) throw new Error("Invalid status")
 
-  const [existing] = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId))
+  const [existing] = await db.select({ status: orders.status, trackingNumber: orders.trackingNumber }).from(orders).where(eq(orders.id, orderId))
   if (!existing) throw new Error("Order not found")
 
+  const trackingNumber = opts?.trackingNumber?.trim()
+  if (status === "shipped" && !existing.trackingNumber && !trackingNumber) {
+    return { error: "Enter a tracking number to mark this order as shipped." }
+  }
+
+  if (status === "cancelled" && existing.status !== "cancelled") {
+    if (!process.env.ADMIN_CANCEL_PIN || opts?.cancelPin !== process.env.ADMIN_CANCEL_PIN) return { error: "Incorrect PIN." }
+  }
+
   await db.transaction(async (tx) => {
-    await tx.update(orders).set({ status, isNew: false, updatedAt: new Date() }).where(eq(orders.id, orderId))
+    const patch: Partial<typeof orders.$inferInsert> = { status, isNew: false, updatedAt: new Date() }
+    if (trackingNumber) patch.trackingNumber = trackingNumber
+    if (status === "confirmed" && existing.status !== "confirmed") {
+      patch.confirmedAt = new Date()
+      patch.confirmationToken = null
+    }
+    await tx.update(orders).set(patch).where(eq(orders.id, orderId))
     if (status === "cancelled" && existing.status !== "cancelled") {
       const items = await tx.select({ productId: orderItems.productId }).from(orderItems).where(eq(orderItems.orderId, orderId))
       for (const item of items) {
@@ -136,4 +198,6 @@ export async function updateOrderStatus(orderId: string, status: (typeof ORDER_S
   revalidatePath("/admin")
   revalidatePath("/admin/orders")
   revalidatePath("/shop")
+  revalidatePath("/track")
+  return { success: true }
 }
