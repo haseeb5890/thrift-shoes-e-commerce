@@ -26,8 +26,9 @@ export async function listUsers() {
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
 }
 
-export async function setUserRole(userId: string, role: "admin" | "user") {
+export async function setUserRole(userId: string, role: "admin" | "user", pin: string): Promise<{ error: string } | { success: true }> {
   const admin = await requireAdminAction()
+  if (!process.env.ADMIN_PROMOTION_PIN || pin !== process.env.ADMIN_PROMOTION_PIN) return { error: "Incorrect PIN." }
   const supabase = createAdminClient()
   const { data: target } = await supabase.auth.admin.getUserById(userId)
   if (!target.user) throw new Error("User not found")
@@ -35,6 +36,7 @@ export async function setUserRole(userId: string, role: "admin" | "user") {
   const { error } = await supabase.auth.admin.updateUserById(userId, { user_metadata: { ...target.user.user_metadata, role } })
   if (error) throw new Error(error.message)
   revalidatePath("/admin/users")
+  return { success: true }
 }
 
 export async function toggleUserBan(userId: string, banned: boolean) {
