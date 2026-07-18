@@ -170,6 +170,10 @@ export async function updateOrderStatus(
   const [existing] = await db.select({ status: orders.status, trackingNumber: orders.trackingNumber }).from(orders).where(eq(orders.id, orderId))
   if (!existing) throw new Error("Order not found")
 
+  // Cancelled is terminal — stock has already been reverted, so allowing a further
+  // transition out of it would let the order's status and inventory drift out of sync.
+  if (existing.status === "cancelled") return { error: "This order is cancelled and can no longer be changed." }
+
   const trackingNumber = opts?.trackingNumber?.trim()
   if (status === "shipped" && !existing.trackingNumber && !trackingNumber) {
     return { error: "Enter a tracking number to mark this order as shipped." }

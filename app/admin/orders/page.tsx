@@ -1,12 +1,34 @@
 import Link from "next/link"
-import { desc, inArray } from "drizzle-orm"
+import { and, count, desc, ilike, inArray } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orderItems, orders } from "@/lib/db/schema"
 import { formatPKR } from "@/lib/store-data"
 import { OrderStatusSelect } from "@/components/order-status-select"
 
-export default async function AdminOrdersPage() {
-  const orderRows = await db.select().from(orders).orderBy(desc(orders.createdAt))
+const PAGE_SIZE = 20
+
+export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; order?: string; page?: string }> }) {
+  const { q, order: orderQuery, page: pageParam } = await searchParams
+  const nameFilter = q?.trim() ?? ""
+  const orderFilter = orderQuery?.trim() ?? ""
+  const hasFilters = Boolean(nameFilter || orderFilter)
+
+  const conditions = []
+  if (nameFilter) conditions.push(ilike(orders.customerName, `%${nameFilter}%`))
+  if (orderFilter) conditions.push(ilike(orders.orderNumber, `%${orderFilter}%`))
+  const where = conditions.length ? and(...conditions) : undefined
+
+  const [{ total }] = await db.select({ total: count() }).from(orders).where(where)
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages)
+
+  const orderRows = await db
+    .select()
+    .from(orders)
+    .where(where)
+    .orderBy(desc(orders.createdAt))
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE)
 
   const itemRows = orderRows.length
     ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderRows.map((order) => order.id)))
@@ -18,10 +40,46 @@ export default async function AdminOrdersPage() {
     else itemsByOrderId.set(item.orderId, [item])
   }
 
+  function pageHref(target: number) {
+    const params = new URLSearchParams()
+    if (nameFilter) params.set("q", nameFilter)
+    if (orderFilter) params.set("order", orderFilter)
+    if (target > 1) params.set("page", String(target))
+    const qs = params.toString()
+    return `/admin/orders${qs ? `?${qs}` : ""}`
+  }
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
       <h1 className="font-serif text-5xl font-black">Orders.</h1>
-      <div className="mt-8 overflow-x-auto bg-background p-5">
+
+      <form method="get" className="mt-6 flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Customer name</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={nameFilter}
+            placeholder="Search by name"
+            className="h-10 border border-input bg-card px-3 text-sm outline-none focus:border-primary"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Order number</span>
+          <div className="flex h-10 items-center border border-input bg-card focus-within:border-primary">
+            <span className="pl-3 text-sm text-muted-foreground">RLP-</span>
+            <input type="text" name="order" defaultValue={orderFilter} placeholder="1234567" className="h-full w-32 bg-transparent px-2 text-sm outline-none" />
+          </div>
+        </label>
+        <button type="submit" className="h-10 bg-primary px-5 text-xs font-bold uppercase tracking-wider text-primary-foreground">Search</button>
+        {hasFilters && (
+          <Link href="/admin/orders" className="flex h-10 items-center px-2 text-xs font-bold uppercase tracking-wider text-muted-foreground underline">
+            Clear
+          </Link>
+        )}
+      </form>
+
+      <div className="mt-6 overflow-x-auto bg-background p-5">
         <table className="w-full min-w-240 text-left text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr>
@@ -37,7 +95,9 @@ export default async function AdminOrdersPage() {
           <tbody>
             {orderRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-muted-foreground">Orders will appear here after checkout.</td>
+                <td colSpan={7} className="py-10 text-center text-muted-foreground">
+                  {hasFilters ? "No orders match your search." : "Orders will appear here after checkout."}
+                </td>
               </tr>
             ) : (
               orderRows.map((order) => {
@@ -72,6 +132,16 @@ export default async function AdminOrdersPage() {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+          <span className="text-muted-foreground">Page {page} of {totalPages} · {total} orders</span>
+          <div className="flex gap-4">
+            {page > 1 ? <Link href={pageHref(page - 1)} className="underline">Previous</Link> : <span className="text-muted-foreground/50">Previous</span>}
+            {page < totalPages ? <Link href={pageHref(page + 1)} className="underline">Next</Link> : <span className="text-muted-foreground/50">Next</span>}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

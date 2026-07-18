@@ -55,6 +55,14 @@ export function OrderStatusSelect({ orderId, status, trackingNumber }: { orderId
     commit(next as (typeof ORDER_STATUSES)[number])
   }
 
+  if (value === "cancelled") {
+    return (
+      <span className={`inline-block border px-2 py-1.5 text-xs font-bold uppercase tracking-wider ${STATUS_COLORS.cancelled}`}>
+        Cancelled
+      </span>
+    )
+  }
+
   if (awaiting === "tracking") {
     return (
       <div className="flex items-center justify-end gap-2">
