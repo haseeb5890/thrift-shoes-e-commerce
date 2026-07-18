@@ -9,7 +9,7 @@ import { OrderStatusTimeline } from "@/components/order-status-timeline"
 import { OrderStatusSelect } from "@/components/order-status-select"
 import { ResendConfirmationButton } from "@/components/resend-confirmation-button"
 
-const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Karachi" }
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -77,16 +77,29 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
       <div className="mt-6 bg-background p-5">
         <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Items</h2>
         <div className="mt-4 flex flex-col divide-y divide-border">
-          {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
-              <img src={item.imageUrl} alt={item.productName} className="size-16 shrink-0 border border-border object-cover" />
-              <div className="flex-1">
-                <p className="text-sm font-bold">{item.productName}</p>
-                <p className="text-xs text-muted-foreground">Size {item.size} · Qty {item.quantity}</p>
+          {items.map((item) => {
+            const itemContent = (
+              <>
+                <img src={item.imageUrl} alt={item.productName} className="size-16 shrink-0 border border-border object-cover" />
+                <div className="flex-1">
+                  <p className={`text-sm font-bold ${item.productSlug ? "underline" : ""}`}>{item.productName}</p>
+                  <p className="text-xs text-muted-foreground">Size {item.size} · Qty {item.quantity}</p>
+                </div>
+              </>
+            )
+            return (
+              <div key={item.id} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
+                {item.productSlug ? (
+                  <Link href={`/shop/${item.productSlug}`} className="flex flex-1 items-center gap-4 hover:opacity-80">
+                    {itemContent}
+                  </Link>
+                ) : (
+                  <div className="flex flex-1 items-center gap-4">{itemContent}</div>
+                )}
+                <p className="text-sm font-bold">{formatPKR(item.unitPrice * item.quantity)}</p>
               </div>
-              <p className="text-sm font-bold">{formatPKR(item.unitPrice * item.quantity)}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="mt-4 flex flex-col gap-1 border-t border-border pt-4 text-sm">

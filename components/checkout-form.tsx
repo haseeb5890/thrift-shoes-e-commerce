@@ -21,7 +21,7 @@ export function CheckoutForm() {
   async function submit(formData: FormData) {
     setLoading(true); setError("")
 
-    const orderPromise = createOrder({ customerName: String(formData.get("name")), email: String(formData.get("email")), phone: String(formData.get("phone")), city, addressLine: String(formData.get("address")), postalCode: String(formData.get("postal") ?? ""), paymentMethod: payment, notes: String(formData.get("notes") ?? ""), shippingFee: shipping, items: cart.map(({id,name,size,price,imageUrl})=>({id,name,size,price,imageUrl})) }).then((order) => {
+    const orderPromise = createOrder({ customerName: String(formData.get("name")), email: String(formData.get("email")), phone: String(formData.get("phone")), city, addressLine: String(formData.get("address")), postalCode: String(formData.get("postal") ?? ""), paymentMethod: payment, notes: String(formData.get("notes") ?? ""), shippingFee: shipping, items: cart.map(({id,slug,name,size,price,imageUrl})=>({id,slug,name,size,price,imageUrl})) }).then((order) => {
       if ("error" in order) throw new Error(order.error)
       return order
     })
