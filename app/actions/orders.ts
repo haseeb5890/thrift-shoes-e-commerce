@@ -1,7 +1,7 @@
 "use server"
 
 import { z } from "zod"
-import { and, eq, gt, sql } from "drizzle-orm"
+import { and, desc, eq, gt, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { orderItems, orders, products } from "@/lib/db/schema"
@@ -10,6 +10,8 @@ import { getOrCreateProfile } from "@/lib/profiles"
 import { ORDER_STATUSES } from "@/lib/order-status"
 import { sendOrderConfirmationEmail, sendOrderConfirmedEmail, sendOrderCancelledEmail } from "@/lib/email"
 import { notifyNewOrder, notifyOrderConfirmed } from "@/lib/slack"
+import { toCsv } from "@/lib/csv"
+import { text } from "stream/consumers"
 
 const CONFIRMATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
@@ -252,4 +254,24 @@ export async function updateOrderStatus(
   revalidatePath("/shop")
   revalidatePath("/track")
   return { success: true }
+}
+export async function exportOrdersCsv(): Promise<string> {
+  await requireAdminAction()
+  const rows = await db.select().from(orders).orderBy(desc(orders.createdAt))
+  return toCsv(rows, [
+    { key: "orderNumber", label: "Order Number" },
+    { key: "customerName", label: "Customer" },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Phone" },
+    { key: "city", label: "City" },
+    { key: "paymentMethod", label: "Payment Method" },
+    { key: "paymentStatus", label: "Payment Status" },
+    { key: "status", label: "Status" },
+    { key: "subtotal", label: "Subtotal" },
+    { key: "shippingFee", label: "Shipping Fee" },
+    { key: "total", label: "Total" },
+    { key: "trackingNumber", label: "Tracking Number" },
+    { key: "confirmedAt", label: "Confirmed At" },
+    { key: "createdAt", label: "Placed At" },
+  ])
 }

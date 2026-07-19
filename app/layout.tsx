@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next"
 import { DM_Sans, Playfair_Display } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
+import { WhatsAppProvider } from "@/components/whatsapp-provider"
+import { WhatsAppFab } from "@/components/whatsapp-fab"
+import { WishlistProvider } from "@/components/wishlist-provider"
 import "./globals.css"
 
 const sans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" })
@@ -14,7 +17,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className="bg-background">
       <body className={`${sans.variable} ${serif.variable} font-sans antialiased`}>
-        {children}
+        <WhatsAppProvider>
+          <WishlistProvider>
+            {children}
+          </WishlistProvider>
+          <WhatsAppFab />
+        </WhatsAppProvider>
         <Toaster
           position="top-center"
           richColors

@@ -1,7 +1,7 @@
 import { Resend } from "resend"
 import { formatPKR } from "@/lib/store-data"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key_for_builds");
 const FROM = process.env.EMAIL_FROM ?? "orders@resend.dev"
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
 

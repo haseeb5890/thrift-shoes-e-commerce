@@ -34,12 +34,14 @@ export function AccountMenu({ user, isAdmin }: { user: AccountMenuUser | null; i
   const items = isAdmin
     ? [
         { label: "My account", href: "/account" },
+        { label: "Wishlist", href: "/wishlist" },
         { label: "Manage products", href: "/admin/products" },
         { label: "Manage orders", href: "/admin/orders" },
         { label: "Manage users", href: "/admin/users" },
       ]
     : [
         { label: "Orders", href: "/account" },
+        { label: "Wishlist", href: "/wishlist" },
         { label: "Profile info", href: "/account" },
       ]
 
