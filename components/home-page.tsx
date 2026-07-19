@@ -3,6 +3,7 @@ import Link from "next/link"
 import { ArrowRight, BadgeCheck, BrushCleaning, PackageCheck, Truck } from "lucide-react"
 import { formatPKR, type Product } from "@/lib/store-data"
 import { ProductCard } from "@/components/product-card"
+import { ReviewsSection } from "@/components/reviews-section"
 
 export function HomePage({ products }: { products: Product[] }) {
   // 1. Safe fallback: Ensure products is always treated as an array
@@ -49,5 +50,6 @@ export function HomePage({ products }: { products: Product[] }) {
       </div>
     </section>
     <section className="bg-primary text-primary-foreground"><div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 md:grid-cols-2 md:px-6 md:py-24"><div><p className="text-xs font-bold uppercase tracking-[0.2em]">The Prime Soles standard</p><h2 className="mt-4 text-balance text-5xl font-black leading-none">No mystery pairs. Every mark disclosed.</h2></div><div className="grid gap-7 sm:grid-cols-2"><div><span className="font-serif text-4xl font-black">01</span><h3 className="mt-3 font-bold">Inspect</h3><p className="mt-2 text-sm leading-6 text-primary-foreground/75">We check soles, stitching, lining, shape and authenticity before listing.</p></div><div><span className="font-serif text-4xl font-black">02</span><h3 className="mt-3 font-bold">Restore</h3><p className="mt-2 text-sm leading-6 text-primary-foreground/75">Every pair is deep-cleaned, deodorized and photographed as it is.</p></div></div></div></section>
+    <ReviewsSection/>
   </>
 }

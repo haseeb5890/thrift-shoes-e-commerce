@@ -15,52 +15,32 @@ type Grade = {
 const GRADES: Grade[] = [
   {
     code: "01",
-    label: "New",
-    summary: "Deadstock or worn once, at most. As close to a fresh pair as thrift gets.",
+    label: "Excellent",
+    summary: "Looks and feels brand new. Only the closest inspection reveals it's pre-owned.",
     details: [
       "No visible creasing, scuffing, or discoloration",
-      "Original tread pattern fully intact",
-      "May or may not include original box",
+      "Sole and tread essentially full, freshly deep-cleaned by us before listing",
+      "As close to a fresh pair as thrift gets",
     ],
   },
   {
     code: "02",
-    label: "Excellent",
-    summary: "Lightly worn and immaculately kept. Flaws, if any, only show up under close inspection.",
-    details: [
-      "Faint creasing at most, no visible marks from a normal distance",
-      "Sole and lining freshly deep-cleaned by us before listing",
-      "Tread close to full depth",
-    ],
-  },
-  {
-    code: "03",
     label: "Very Good",
-    summary: "Gently worn with honest, minor signs of use. Fully clean and ready to wear.",
+    summary: "Gently worn with only minor, honest signs of use. Clean and ready to wear.",
     details: [
-      "Light creasing on the toe box or minor cosmetic marks",
+      "Light creasing or a small cosmetic mark at most",
       "No structural issues — upper, sole, and lining all sound",
       "Sanitized and conditioned before photographing",
     ],
   },
   {
-    code: "04",
-    label: "Good",
-    summary: "Comfortable, broken-in pairs with wear consistent with regular use.",
+    code: "03",
+    label: "Average",
+    summary: "Comfortable, well-loved pairs with visible wear from regular use — priced to match.",
     details: [
-      "Visible creasing and some surface wear on the upper",
-      "Tread shows use but still has meaningful life left",
-      "Any notable marks are called out specifically in the listing",
-    ],
-  },
-  {
-    code: "05",
-    label: "Fair",
-    summary: "Well-loved pairs, priced to match. Great for breaking in further or heavy rotation.",
-    details: [
-      "Noticeable wear — creasing, scuffing, or fading",
+      "Noticeable creasing, scuffing, or fading consistent with regular wear",
       "Still structurally solid and comfortable to wear",
-      "Always the most detailed condition notes, so there are no surprises",
+      "Condition notes on the product page always detail exactly what to expect",
     ],
   },
 ]
@@ -73,7 +53,7 @@ export default function ConditionGuidePage() {
         One pair, one honest grade.
       </h1>
       <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground">
-        Every pair on Prime Soles goes through the same 30+ point inspection before it's listed. We don't use stock
+        Every pair on ReLace goes through the same 30+ point inspection before it's listed. We don't use stock
         photos or generic descriptions — the grade below, and the condition notes on each product page, describe
         the exact pair you'll receive.
       </p>

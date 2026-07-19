@@ -1,12 +1,13 @@
 "use server"
 
-import { and, eq, gte, lte, ne, sql } from "drizzle-orm"
+import { and, eq, gte, lte, ne, sql, desc } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orders } from "@/lib/db/schema"
 import { requireAdminAction } from "@/lib/auth-helpers"
 import { ORDER_STATUSES } from "@/lib/order-status"
+import { toCsv } from "@/lib/csv"
+import { resolveDateRange, type AnalyticsPeriod } from "@/lib/date-range"
 
-export type AnalyticsPeriod = "today" | "7d" | "30d" | "custom"
 export type OrderStatusFilter = "all" | (typeof ORDER_STATUSES)[number]
 
 export type OrderAnalytics = {
@@ -15,32 +16,6 @@ export type OrderAnalytics = {
   statusBreakdown: Record<(typeof ORDER_STATUSES)[number], number>
   from: string
   to: string
-}
-
-function resolveDateRange(period: AnalyticsPeriod, customFrom?: string, customTo?: string) {
-  const now = new Date()
-
-  const startOfToday = new Date(now)
-  startOfToday.setHours(0, 0, 0, 0)
-
-  const endOfToday = new Date(now)
-  endOfToday.setHours(23, 59, 59, 999)
-
-  if (period === "custom") {
-    const from = customFrom ? new Date(customFrom) : new Date(0)
-    from.setHours(0, 0, 0, 0)
-    const to = customTo ? new Date(customTo) : endOfToday
-    to.setHours(23, 59, 59, 999)
-    return { from, to }
-  }
-
-  if (period === "today") return { from: startOfToday, to: endOfToday }
-
-  // "Last 7/30 days" includes today as one of the days in the window.
-  const days = period === "7d" ? 7 : 30
-  const from = new Date(startOfToday)
-  from.setDate(from.getDate() - (days - 1))
-  return { from, to: endOfToday }
 }
 
 /**
@@ -104,4 +79,23 @@ export async function getOrderAnalytics(input: {
     from: from.toISOString(),
     to: to.toISOString(),
   }
+}
+
+export async function exportAnalyticsCsv(input: { period: AnalyticsPeriod; from?: string; to?: string; status?: OrderStatusFilter }): Promise<string> {
+  await requireAdminAction()
+  const { from, to } = resolveDateRange(input.period, input.from, input.to)
+  const dateCondition = and(gte(orders.createdAt, from), lte(orders.createdAt, to))
+  const hasStatusFilter = input.status && input.status !== "all"
+  const where = hasStatusFilter ? and(dateCondition, eq(orders.status, input.status as (typeof ORDER_STATUSES)[number])) : dateCondition
+
+  const rows = await db.select().from(orders).where(where).orderBy(desc(orders.createdAt))
+  return toCsv(rows, [
+    { key: "orderNumber", label: "Order Number" },
+    { key: "customerName", label: "Customer" },
+    { key: "city", label: "City" },
+    { key: "status", label: "Status" },
+    { key: "paymentMethod", label: "Payment Method" },
+    { key: "total", label: "Total" },
+    { key: "createdAt", label: "Placed At" },
+  ])
 }
