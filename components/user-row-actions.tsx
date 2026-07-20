@@ -12,10 +12,17 @@ export function UserRowActions({ user, locked }: { user: Row; locked: boolean })
   const [pending, startTransition] = useTransition()
   const [awaitingPin, setAwaitingPin] = useState(false)
   const [pin, setPin] = useState("")
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   function run(action: () => Promise<void>) {
     startTransition(async () => {
-      try { await action(); router.refresh() } catch (error) { alert(error instanceof Error ? error.message : "Action failed") }
+      try {
+        await action()
+        router.refresh()
+        setConfirmingDelete(false)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Action failed")
+      }
     })
   }
 
@@ -36,7 +43,7 @@ export function UserRowActions({ user, locked }: { user: Row; locked: boolean })
 
   if (awaitingPin) {
     return (
-      <div className="flex flex-wrap items-center justify-end gap-2 text-xs font-bold uppercase tracking-wider">
+      <div className="animate-in fade-in-0 slide-in-from-right-1 flex flex-wrap items-center justify-end gap-2 text-xs font-bold uppercase tracking-wider duration-150">
         <input
           value={pin}
           onChange={(e) => setPin(e.target.value)}
@@ -52,11 +59,23 @@ export function UserRowActions({ user, locked }: { user: Row; locked: boolean })
     )
   }
 
+  if (confirmingDelete) {
+    return (
+      <div className="animate-in fade-in-0 slide-in-from-right-1 flex flex-wrap items-center justify-end gap-2 text-xs font-bold uppercase tracking-wider duration-150">
+        <span className="normal-case tracking-normal text-muted-foreground">Delete {user.email}?</span>
+        <button disabled={pending} onClick={() => run(() => deleteUserAccount(user.id))} className="text-destructive underline disabled:opacity-50">
+          {pending ? "Deleting..." : "Confirm"}
+        </button>
+        <button disabled={pending} onClick={() => setConfirmingDelete(false)} className="text-muted-foreground underline disabled:opacity-50">Never mind</button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-wrap justify-end gap-2 text-xs font-bold uppercase tracking-wider">
-      <button disabled={pending} onClick={() => setAwaitingPin(true)} className="underline">{user.role === "admin" ? "Demote" : "Promote"}</button>
-      <button disabled={pending} onClick={() => run(() => toggleUserBan(user.id, !user.banned))} className="underline">{user.banned ? "Unban" : "Ban"}</button>
-      <button disabled={pending} onClick={() => { if (confirm(`Delete ${user.email}? This can't be undone.`)) run(() => deleteUserAccount(user.id)) }} className="text-destructive underline">Delete</button>
+      <button disabled={pending} onClick={() => setAwaitingPin(true)} className="underline disabled:opacity-50">{user.role === "admin" ? "Demote" : "Promote"}</button>
+      <button disabled={pending} onClick={() => run(() => toggleUserBan(user.id, !user.banned))} className="underline disabled:opacity-50">{user.banned ? "Unban" : "Ban"}</button>
+      <button disabled={pending} onClick={() => setConfirmingDelete(true)} className="text-destructive underline disabled:opacity-50">Delete</button>
     </div>
   )
 }

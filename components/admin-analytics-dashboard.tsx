@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { getOrderAnalytics, type AnalyticsPeriod, type OrderAnalytics, type OrderStatusFilter } from "@/app/actions/analytics"
+import { getOrderAnalytics, type OrderAnalytics, type OrderStatusFilter } from "@/app/actions/analytics"
+import type { AnalyticsPeriod } from "@/lib/date-range"
 import { formatPKR } from "@/lib/store-data"
+import { ExportCsvButton } from "@/components/export-csv-button"
 
 const PERIODS: { value: AnalyticsPeriod; label: string }[] = [
   { value: "today", label: "Today" },
@@ -15,6 +17,7 @@ const PERIODS: { value: AnalyticsPeriod; label: string }[] = [
 const STATUS_FILTERS: { value: OrderStatusFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "placed", label: "Pending" },
+  { value: "confirmed", label: "Confirmed" },
   { value: "delivered", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
 ]
@@ -109,6 +112,13 @@ export function AdminAnalyticsDashboard({ initialData }: { initialData: OrderAna
         )}
 
         {isPending && <p className="pb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Updating...</p>}
+
+        <div className="ml-auto pb-1">
+          <ExportCsvButton
+            target={{ type: "analytics", filters: { period, status, from: period === "custom" ? customFrom : undefined, to: period === "custom" ? customTo : undefined } }}
+            filename={`analytics-${period}-${status}-${new Date().toISOString().slice(0, 10)}.csv`}
+          />
+        </div>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">

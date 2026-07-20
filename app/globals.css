@@ -23,13 +23,14 @@
   --destructive-foreground: #fffaf1;
   --border: #cfc9bc;
   --input: #cfc9bc;
-  --ring: #25df35;
+  --ring: #6fae95;
   --radius: 0.15rem;
 }
 
 @theme inline {
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-serif: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-product: var(--font-heading), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

@@ -1,130 +1,128 @@
 import Link from "next/link"
-import { and, count, desc, ilike, inArray } from "drizzle-orm"
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orderItems, orders } from "@/lib/db/schema"
 import { formatPKR } from "@/lib/store-data"
 import { OrderStatusSelect } from "@/components/order-status-select"
+import { ExportCsvButton } from "@/components/export-csv-button"
 
 const PAGE_SIZE = 20
 
-export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; order?: string; page?: string }> }) {
-  const { q, order: orderQuery, page: pageParam } = await searchParams
-  const nameFilter = q?.trim() ?? ""
-  const orderFilter = orderQuery?.trim() ?? ""
-  const hasFilters = Boolean(nameFilter || orderFilter)
+export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+  const { q, page: pageParam } = await searchParams
+  const query = q?.trim() ?? ""
+  const page = Math.max(1, Number(pageParam) || 1)
 
-  const conditions = []
-  if (nameFilter) conditions.push(ilike(orders.customerName, `%${nameFilter}%`))
-  if (orderFilter) conditions.push(ilike(orders.orderNumber, `%${orderFilter}%`))
-  const where = conditions.length ? and(...conditions) : undefined
+  // Customers only type the numeric part of an order number — RLP- is implied, so a
+  // fully-numeric search also matches against "RLP-<query>" in addition to a plain substring match.
+  const where = query
+    ? or(
+        ilike(orders.orderNumber, `%${query}%`),
+        ilike(orders.customerName, `%${query}%`),
+        /^\d+$/.test(query) ? ilike(orders.orderNumber, `%RLP-${query}%`) : undefined,
+      )
+    : undefined
 
-  const [{ total }] = await db.select({ total: count() }).from(orders).where(where)
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages)
+  const [orderRows, [{ count }]] = await Promise.all([
+    db.select().from(orders).where(where).orderBy(desc(orders.createdAt)).limit(PAGE_SIZE).offset((page - 1) * PAGE_SIZE),
+    db.select({ count: sql<number>`count(*)::int` }).from(orders).where(where),
+  ])
 
-  const orderRows = await db
-    .select()
-    .from(orders)
-    .where(where)
-    .orderBy(desc(orders.createdAt))
-    .limit(PAGE_SIZE)
-    .offset((page - 1) * PAGE_SIZE)
-
-  const itemRows = orderRows.length
-    ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderRows.map((order) => order.id)))
-    : []
-  const itemsByOrderId = new Map<string, typeof itemRows>()
-  for (const item of itemRows) {
-    const existing = itemsByOrderId.get(item.orderId)
-    if (existing) existing.push(item)
-    else itemsByOrderId.set(item.orderId, [item])
+  const orderIds = orderRows.map((order) => order.id)
+  const items = orderIds.length ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds)) : []
+  const itemsByOrder = new Map<string, typeof items>()
+  for (const item of items) {
+    const list = itemsByOrder.get(item.orderId) ?? []
+    list.push(item)
+    itemsByOrder.set(item.orderId, list)
   }
 
-  function pageHref(target: number) {
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+
+  function pageHref(targetPage: number) {
     const params = new URLSearchParams()
-    if (nameFilter) params.set("q", nameFilter)
-    if (orderFilter) params.set("order", orderFilter)
-    if (target > 1) params.set("page", String(target))
+    if (query) params.set("q", query)
+    if (targetPage > 1) params.set("page", String(targetPage))
     const qs = params.toString()
     return `/admin/orders${qs ? `?${qs}` : ""}`
   }
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
-      <h1 className="font-serif text-5xl font-black">Orders.</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-serif text-5xl font-black">Orders.</h1>
+        <ExportCsvButton target={{ type: "orders" }} filename={`orders-${new Date().toISOString().slice(0, 10)}.csv`} />
+      </div>
 
-      <form method="get" className="mt-6 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Customer name</span>
-          <input
-            type="text"
-            name="q"
-            defaultValue={nameFilter}
-            placeholder="Search by name"
-            className="h-10 border border-input bg-card px-3 text-sm outline-none focus:border-primary"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Order number</span>
-          <div className="flex h-10 items-center border border-input bg-card focus-within:border-primary">
-            <span className="pl-3 text-sm text-muted-foreground">RLP-</span>
-            <input type="text" name="order" defaultValue={orderFilter} placeholder="1234567" className="h-full w-32 bg-transparent px-2 text-sm outline-none" />
-          </div>
-        </label>
-        <button type="submit" className="h-10 bg-primary px-5 text-xs font-bold uppercase tracking-wider text-primary-foreground">Search</button>
-        {hasFilters && (
-          <Link href="/admin/orders" className="flex h-10 items-center px-2 text-xs font-bold uppercase tracking-wider text-muted-foreground underline">
+      <form action="/admin/orders" className="mt-6 flex gap-2">
+        <input
+          type="text"
+          name="q"
+          defaultValue={query}
+          placeholder="Search by customer name or order number"
+          className="h-11 flex-1 max-w-sm border border-border bg-card px-3 text-sm outline-none focus:border-primary"
+        />
+        <button type="submit" className="h-11 border border-foreground px-5 text-xs font-bold uppercase tracking-wider">Search</button>
+        {query && (
+          <Link href="/admin/orders" className="flex h-11 items-center px-4 text-xs font-bold uppercase tracking-wider underline">
             Clear
           </Link>
         )}
       </form>
 
       <div className="mt-6 overflow-x-auto bg-background p-5">
-        <table className="w-full min-w-240 text-left text-sm">
+        <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="py-3">Order</th>
-              <th>Customer</th>
-              <th>Products</th>
-              <th>Address</th>
-              <th>Payment</th>
-              <th>Total</th>
-              <th className="text-right">Status</th>
+              <th className="px-3 py-3">Order</th>
+              <th className="px-3 py-3">Customer</th>
+              <th className="px-3 py-3">Address</th>
+              <th className="px-3 py-3">Products</th>
+              <th className="px-3 py-3">Payment</th>
+              <th className="px-3 py-3">Total</th>
+              <th className="px-3 py-3 text-right">Status</th>
             </tr>
           </thead>
           <tbody>
             {orderRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-muted-foreground">
-                  {hasFilters ? "No orders match your search." : "Orders will appear here after checkout."}
+                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                  {query ? `No orders match "${query}".` : "Orders will appear here after checkout."}
                 </td>
               </tr>
             ) : (
               orderRows.map((order) => {
-                const items = itemsByOrderId.get(order.id) ?? []
+                const orderItemRows = itemsByOrder.get(order.id) ?? []
                 return (
                   <tr key={order.id} className="border-b border-border align-top">
-                    <td className="py-4 font-bold">
+                    <td className="px-3 py-4 font-bold">
                       <Link href={`/admin/orders/${order.id}`} className="underline">{order.orderNumber}</Link>
                     </td>
-                    <td>{order.customerName}<p className="text-xs text-muted-foreground">{order.email}</p></td>
-                    <td className="max-w-55">
-                      {items.length === 0 ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <>
-                          {items[0].productName} <span className="text-xs text-muted-foreground">({items[0].size})</span>
-                          {items.length > 1 && <span className="block text-xs text-muted-foreground">+{items.length - 1} more</span>}
-                        </>
-                      )}
+                    <td className="px-3 py-4">
+                      {order.customerName}
+                      <p className="text-xs text-muted-foreground">{order.email}</p>
                     </td>
-                    <td className="max-w-55">
-                      {order.addressLine}, {order.city}
-                      {order.postalCode && <span className="text-xs text-muted-foreground"> {order.postalCode}</span>}
+                    <td className="px-3 py-4 text-xs text-muted-foreground">
+                      {order.addressLine}
+                      <p>{order.city}{order.postalCode ? `, ${order.postalCode}` : ""}</p>
                     </td>
-                    <td className="capitalize">{order.paymentMethod}</td>
-                    <td className="font-bold">{formatPKR(order.total)}</td>
-                    <td className="text-right"><OrderStatusSelect orderId={order.id} status={order.status} trackingNumber={order.trackingNumber}/></td>
+                    <td className="px-3 py-4 text-xs">
+                      {orderItemRows.length === 0
+                        ? <span className="text-muted-foreground">—</span>
+                        : (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold">{orderItemRows[0].productName} · Size {orderItemRows[0].size}</span>
+                            {orderItemRows.length > 1 && (
+                              <span className="text-muted-foreground">+{orderItemRows.length - 1} more</span>
+                            )}
+                          </div>
+                        )}
+                    </td>
+                    <td className="px-3 py-4 capitalize">{order.paymentMethod}</td>
+                    <td className="px-3 py-4 font-bold">{formatPKR(order.total)}</td>
+                    <td className="px-3 py-4 text-right">
+                      <OrderStatusSelect orderId={order.id} status={order.status} trackingNumber={order.trackingNumber} />
+                    </td>
                   </tr>
                 )
               })
@@ -134,13 +132,31 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
-          <span className="text-muted-foreground">Page {page} of {totalPages} · {total} orders</span>
-          <div className="flex gap-4">
-            {page > 1 ? <Link href={pageHref(page - 1)} className="underline">Previous</Link> : <span className="text-muted-foreground/50">Previous</span>}
-            {page < totalPages ? <Link href={pageHref(page + 1)} className="underline">Next</Link> : <span className="text-muted-foreground/50">Next</span>}
-          </div>
-        </div>
+        <nav className="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
+          <Link
+            href={pageHref(Math.max(1, page - 1))}
+            aria-disabled={page <= 1}
+            className={`flex h-9 min-w-9 items-center justify-center border border-border px-3 text-xs font-bold uppercase tracking-wider ${page <= 1 ? "pointer-events-none opacity-40" : "hover:border-foreground"}`}
+          >
+            Prev
+          </Link>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <Link
+              key={p}
+              href={pageHref(p)}
+              className={`flex h-9 min-w-9 items-center justify-center border px-3 text-xs font-bold ${p === page ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground"}`}
+            >
+              {p}
+            </Link>
+          ))}
+          <Link
+            href={pageHref(Math.min(totalPages, page + 1))}
+            aria-disabled={page >= totalPages}
+            className={`flex h-9 min-w-9 items-center justify-center border border-border px-3 text-xs font-bold uppercase tracking-wider ${page >= totalPages ? "pointer-events-none opacity-40" : "hover:border-foreground"}`}
+          >
+            Next
+          </Link>
+        </nav>
       )}
     </section>
   )

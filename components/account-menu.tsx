@@ -34,12 +34,14 @@ export function AccountMenu({ user, isAdmin }: { user: AccountMenuUser | null; i
   const items = isAdmin
     ? [
         { label: "My account", href: "/account" },
+        { label: "Wishlist", href: "/wishlist" },
         { label: "Manage products", href: "/admin/products" },
         { label: "Manage orders", href: "/admin/orders" },
         { label: "Manage users", href: "/admin/users" },
       ]
     : [
         { label: "Orders", href: "/account" },
+        { label: "Wishlist", href: "/wishlist" },
         { label: "Profile info", href: "/account" },
       ]
 
@@ -51,7 +53,7 @@ export function AccountMenu({ user, isAdmin }: { user: AccountMenuUser | null; i
         <ChevronDown size={16} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-56 border border-border bg-background py-2 shadow-xl">
+        <div className="animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 absolute right-0 top-full z-50 mt-2 w-56 origin-top-right border border-border bg-background py-2 shadow-xl duration-150">
           {items.map((item) => (
             <Link key={item.label} href={item.href} onClick={() => setOpen(false)} className="block px-4 py-2 text-sm font-semibold hover:bg-secondary">{item.label}</Link>
           ))}
