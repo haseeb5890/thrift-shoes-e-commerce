@@ -27,3 +27,26 @@ export const fallbackProducts: Product[] = [
 export const shippingRates: Record<string, number> = { Karachi: 250, Lahore: 250, Islamabad: 250, Rawalpindi: 250, Faisalabad: 350, Multan: 350, Peshawar: 350, Quetta: 350, Sialkot: 350, Gujranwala: 350, Hyderabad: 350, Other: 450 }
 export const cities = Object.keys(shippingRates)
 export const formatPKR = (amount: number) => new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(amount)
+
+// Estimated delivery window: order date + 4 days to order date + 6 days, expressed in
+// Pakistan calendar days (not UTC) so an order placed late at night doesn't drift a day off.
+export function getDeliveryWindow(orderDate: Date, minDays = 4, maxDays = 6): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(orderDate)
+  const y = Number(parts.find((p) => p.type === "year")!.value)
+  const m = Number(parts.find((p) => p.type === "month")!.value)
+  const d = Number(parts.find((p) => p.type === "day")!.value)
+  const civil = new Date(Date.UTC(y, m - 1, d))
+
+  const start = new Date(civil)
+  start.setUTCDate(start.getUTCDate() + minDays)
+  const end = new Date(civil)
+  end.setUTCDate(end.getUTCDate() + maxDays)
+
+  const monthOf = (date: Date) => date.toLocaleString("en-PK", { month: "long", timeZone: "UTC" })
+  const startMonth = monthOf(start)
+  const endMonth = monthOf(end)
+
+  return startMonth === endMonth
+    ? `${start.getUTCDate()}–${end.getUTCDate()} ${startMonth}`
+    : `${start.getUTCDate()} ${startMonth} – ${end.getUTCDate()} ${endMonth}`
+}

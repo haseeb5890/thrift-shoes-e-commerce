@@ -5,7 +5,7 @@ import { getOrdersForProfile } from "@/app/actions/tracking"
 import { TrackForm } from "@/components/track-form"
 import { OrderStatusTimeline } from "@/components/order-status-timeline"
 import { CancelOrderButton } from "@/components/cancel-order-button"
-import { formatPKR } from "@/lib/store-data"
+import { formatPKR, getDeliveryWindow } from "@/lib/store-data"
 
 const CANCELLABLE_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours — mirrors app/actions/orders.ts
 
@@ -37,7 +37,7 @@ export default async function TrackPage() {
 
               <OrderStatusTimeline status={order.status} className="mt-6" />
 
-              <div className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-5">
                 <div>
                   <p className="text-muted-foreground">Payment</p>
                   <p className="font-bold capitalize">{order.paymentStatus}</p>
@@ -46,6 +46,12 @@ export default async function TrackPage() {
                   <p className="text-muted-foreground">Destination</p>
                   <p className="font-bold">{order.city}</p>
                 </div>
+                {order.status !== "cancelled" && order.status !== "delivered" && (
+                  <div>
+                    <p className="text-muted-foreground">Delivery</p>
+                    <p className="font-bold text-primary">Delivered by: {getDeliveryWindow(new Date(order.createdAt))}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-muted-foreground">Tracking</p>
                   <div className="flex items-center gap-2">

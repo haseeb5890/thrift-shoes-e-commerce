@@ -1,7 +1,25 @@
 import { and, asc, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm"
+import { unstable_cache } from "next/cache"
 import { db } from "@/lib/db"
 import { products, productMedia } from "@/lib/db/schema"
 import { fallbackProducts, type Product } from "@/lib/store-data"
+
+// The "universe" of sizes/brands/conditions/genders (which values exist at all) only changes
+// when inventory is added/removed — unlike live counts, it's safe to cache briefly and cut
+// 4 of the 9 faceted-filter queries on most shop page loads.
+const getFacetUniverse = unstable_cache(
+  async () => {
+    const [sizeUniverse, brandUniverse, conditionUniverse, genderUniverse] = await Promise.all([
+      db.selectDistinct({ value: products.size }).from(products).where(eq(products.isActive, true)),
+      db.selectDistinct({ value: products.brand }).from(products).where(eq(products.isActive, true)),
+      db.selectDistinct({ value: products.condition }).from(products).where(eq(products.isActive, true)),
+      db.selectDistinct({ value: products.gender }).from(products).where(eq(products.isActive, true)),
+    ])
+    return { sizeUniverse, brandUniverse, conditionUniverse, genderUniverse }
+  },
+  ["product-facet-universe"],
+  { revalidate: 60, tags: ["product-facet-universe"] },
+)
 
 export const PAGE_SIZE = 18
 
@@ -156,8 +174,13 @@ export async function getProducts(filters: ProductFilters = {}): Promise<Product
 }
 
 export async function getProduct(slug: string) {
-  const items = await getAllProducts()
-  return items.find((item) => item.slug === slug)
+  try {
+    const rows = await db.select().from(products).where(and(eq(products.slug, slug), eq(products.isActive, true)))
+    if (rows.length) return rows[0]
+  } catch {
+    // fall through to in-memory fallback below
+  }
+  return fallbackProducts.find((item) => item.slug === slug)
 }
 
 export async function getProductById(id: string) {
@@ -199,11 +222,8 @@ export async function getFacetedFilterCounts(filters: ProductFilters = {}): Prom
       return and(...list)!
     }
 
-    const [sizeUniverse, brandUniverse, conditionUniverse, genderUniverse, sizeCounts, brandCounts, conditionCounts, genderCounts, priceRow] = await Promise.all([
-      db.selectDistinct({ value: products.size }).from(products).where(eq(products.isActive, true)),
-      db.selectDistinct({ value: products.brand }).from(products).where(eq(products.isActive, true)),
-      db.selectDistinct({ value: products.condition }).from(products).where(eq(products.isActive, true)),
-      db.selectDistinct({ value: products.gender }).from(products).where(eq(products.isActive, true)),
+    const [{ sizeUniverse, brandUniverse, conditionUniverse, genderUniverse }, sizeCounts, brandCounts, conditionCounts, genderCounts, priceRow] = await Promise.all([
+      getFacetUniverse(),
       db.select({ value: products.size, count: sql<number>`count(*)::int` }).from(products).where(otherConditions("size")).groupBy(products.size),
       db.select({ value: products.brand, count: sql<number>`count(*)::int` }).from(products).where(otherConditions("brand")).groupBy(products.brand),
       db

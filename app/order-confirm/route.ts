@@ -23,6 +23,8 @@ export async function GET(request: Request) {
       subtotal: orders.subtotal,
       shippingFee: orders.shippingFee,
       total: orders.total,
+      promoCode: orders.promoCode,
+      discountAmount: orders.discountAmount,
     })
     .from(orders)
     .where(eq(orders.confirmationToken, token))
@@ -47,16 +49,20 @@ export async function GET(request: Request) {
     .select({ slug: orderItems.productSlug, name: orderItems.productName, size: orderItems.size, imageUrl: orderItems.imageUrl, unitPrice: orderItems.unitPrice })
     .from(orderItems)
     .where(eq(orderItems.orderId, order.id))
-  await notifyOrderConfirmed({ orderNumber: updated.orderNumber, customerName: order.customerName, via: "customer", items: confirmedItems })
-  await sendOrderConfirmedEmail({
-    to: order.email,
-    customerName: order.customerName,
-    orderNumber: updated.orderNumber,
-    items: confirmedItems.map((item) => ({ name: item.name, size: item.size, price: item.unitPrice, imageUrl: item.imageUrl })),
-    subtotal: order.subtotal,
-    shippingFee: order.shippingFee,
-    total: order.total,
-  })
+  await Promise.all([
+    notifyOrderConfirmed({ orderNumber: updated.orderNumber, customerName: order.customerName, via: "customer", items: confirmedItems }),
+    sendOrderConfirmedEmail({
+      to: order.email,
+      customerName: order.customerName,
+      orderNumber: updated.orderNumber,
+      items: confirmedItems.map((item) => ({ name: item.name, size: item.size, price: item.unitPrice, imageUrl: item.imageUrl })),
+      subtotal: order.subtotal,
+      shippingFee: order.shippingFee,
+      total: order.total,
+      promoCode: order.promoCode,
+      discountAmount: order.discountAmount,
+    }),
+  ])
 
   revalidatePath("/admin/orders")
   revalidatePath("/track")

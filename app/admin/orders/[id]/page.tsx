@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
@@ -80,7 +81,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           {items.map((item) => {
             const itemContent = (
               <>
-                <img src={item.imageUrl} alt={item.productName} className="size-16 shrink-0 border border-border object-cover" />
+                <Image src={item.imageUrl} alt={item.productName} width={64} height={64} className="size-16 shrink-0 border border-border object-cover" />
                 <div className="flex-1">
                   <p className={`text-sm font-bold ${item.productSlug ? "underline" : ""}`}>{item.productName}</p>
                   <p className="text-xs text-muted-foreground">Size {item.size} · Qty {item.quantity}</p>
@@ -111,6 +112,12 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             <span>Shipping</span>
             <span>{formatPKR(order.shippingFee)}</span>
           </div>
+          {order.discountAmount > 0 && (
+            <div className="flex justify-between text-accent">
+              <span>Discount {order.promoCode ? `(${order.promoCode})` : ""}</span>
+              <span>−{formatPKR(order.discountAmount)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-base font-bold">
             <span>Total</span>
             <span>{formatPKR(order.total)}</span>

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { db } from "@/lib/db"
 import { products } from "@/lib/db/schema"
 import { ExportCsvButton } from "@/components/export-csv-button"
+import { InlinePriceEditor } from "@/components/inline-price-editor"
 
 export default async function AdminProductsPage() {
   const productRows = await db.select().from(products).orderBy(desc(products.createdAt))
@@ -23,6 +24,7 @@ export default async function AdminProductsPage() {
               <th className="px-3 py-3">Brand</th>
               <th className="px-3 py-3">Type</th>
               <th className="px-3 py-3">Size</th>
+              <th className="px-3 py-3">Price</th>
               <th className="px-3 py-3">Stock</th>
               <th className="px-3 py-3">Status</th>
               <th className="px-3 py-3 text-right">Edit</th>
@@ -30,7 +32,7 @@ export default async function AdminProductsPage() {
           </thead>
           <tbody>
             {productRows.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No products yet.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">No products yet.</td></tr>
             ) : (
               productRows.map((product) => (
                 <tr key={product.id} className="border-b border-border">
@@ -38,6 +40,7 @@ export default async function AdminProductsPage() {
                   <td className="px-3 py-4">{product.brand}</td>
                   <td className="px-3 py-4">{product.category}</td>
                   <td className="px-3 py-4">{product.size}</td>
+                  <td className="px-3 py-4"><InlinePriceEditor productId={product.id} price={product.price} /></td>
                   <td className="px-3 py-4">{product.stock}</td>
                   <td className="px-3 py-4">
                     <span className={`text-xs font-bold uppercase ${product.stock ? "text-accent" : "text-destructive"}`}>{product.stock ? "Live" : "Sold"}</span>

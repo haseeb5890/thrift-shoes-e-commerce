@@ -1,10 +1,11 @@
+import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft, ExternalLink } from "lucide-react"
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orderItems, orders } from "@/lib/db/schema"
-import { formatPKR } from "@/lib/store-data"
+import { formatPKR, getDeliveryWindow } from "@/lib/store-data"
 import { getSessionProfile } from "@/lib/auth-helpers"
 import { OrderStatusTimeline } from "@/components/order-status-timeline"
 import { CancelOrderButton } from "@/components/cancel-order-button"
@@ -23,6 +24,7 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id))
 
   const canCancel = order.status === "placed" && Date.now() - new Date(order.createdAt).getTime() <= CANCELLABLE_WINDOW_MS
+  const showDeliveryEstimate = order.status !== "cancelled" && order.status !== "delivered"
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-16 md:px-6">
@@ -34,6 +36,9 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
         <p className="text-xs font-bold uppercase tracking-widest text-primary">{order.orderNumber}</p>
         <h1 className="mt-1 font-serif text-4xl font-black">{formatPKR(order.total)}</h1>
         <p className="mt-1 text-sm text-muted-foreground">Placed {new Date(order.createdAt).toLocaleString("en-PK", DATE_FORMAT)}</p>
+        {showDeliveryEstimate && (
+          <p className="mt-2 text-sm font-bold text-primary">Delivered by: {getDeliveryWindow(new Date(order.createdAt))}</p>
+        )}
       </div>
 
       <OrderStatusTimeline status={order.status} className="mt-8" />
@@ -72,7 +77,7 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
           {items.map((item) => {
             const itemContent = (
               <>
-                <img src={item.imageUrl} alt={item.productName} className="size-16 shrink-0 border border-border object-cover" />
+                <Image src={item.imageUrl} alt={item.productName} width={64} height={64} className="size-16 shrink-0 border border-border object-cover" />
                 <div className="flex-1">
                   <p className={`text-sm font-bold ${item.productSlug ? "underline" : ""}`}>{item.productName}</p>
                   <p className="text-xs text-muted-foreground">Size {item.size} · Qty {item.quantity}</p>
@@ -103,6 +108,12 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
             <span>Shipping</span>
             <span>{formatPKR(order.shippingFee)}</span>
           </div>
+          {order.discountAmount > 0 && (
+            <div className="flex justify-between text-accent">
+              <span>Discount {order.promoCode ? `(${order.promoCode})` : ""}</span>
+              <span>−{formatPKR(order.discountAmount)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-base font-bold">
             <span>Total</span>
             <span>{formatPKR(order.total)}</span>

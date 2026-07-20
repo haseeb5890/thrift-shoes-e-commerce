@@ -47,14 +47,16 @@ export function MobileBottomNav({ user }: { user: AccountMenuUser | null }) {
         type="button"
         onClick={() => setCartOpen(true)}
         aria-label={`Open cart with ${cartCount} items`}
-        className={`relative ${itemClass(false)}`}
+        className={itemClass(false)}
       >
-        <ShoppingBag size={19} />
-        {cartCount > 0 && (
-          <span className="absolute right-[27%] top-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
-            {cartCount}
-          </span>
-        )}
+        <span className="relative">
+          <ShoppingBag size={19} />
+          {cartCount > 0 && (
+            <span className="absolute -right-2 -top-2 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+              {cartCount}
+            </span>
+          )}
+        </span>
         Cart
       </button>
     </nav>
