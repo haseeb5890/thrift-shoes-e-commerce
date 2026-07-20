@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react"
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orderItems, orders } from "@/lib/db/schema"
-import { formatPKR } from "@/lib/store-data"
+import { formatPKR, getDeliveryWindow } from "@/lib/store-data"
 import { getSessionProfile } from "@/lib/auth-helpers"
 import { OrderStatusTimeline } from "@/components/order-status-timeline"
 import { CancelOrderButton } from "@/components/cancel-order-button"
@@ -23,6 +23,7 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id))
 
   const canCancel = order.status === "placed" && Date.now() - new Date(order.createdAt).getTime() <= CANCELLABLE_WINDOW_MS
+  const showDeliveryEstimate = order.status !== "cancelled" && order.status !== "delivered"
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-16 md:px-6">
@@ -34,6 +35,9 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
         <p className="text-xs font-bold uppercase tracking-widest text-primary">{order.orderNumber}</p>
         <h1 className="mt-1 font-serif text-4xl font-black">{formatPKR(order.total)}</h1>
         <p className="mt-1 text-sm text-muted-foreground">Placed {new Date(order.createdAt).toLocaleString("en-PK", DATE_FORMAT)}</p>
+        {showDeliveryEstimate && (
+          <p className="mt-2 text-sm font-bold text-primary">{getDeliveryWindow(new Date(order.createdAt))}</p>
+        )}
       </div>
 
       <OrderStatusTimeline status={order.status} className="mt-8" />

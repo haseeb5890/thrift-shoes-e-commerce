@@ -21,9 +21,9 @@ const TRENDING = [
   { label: "fila", type: "brand" as const, value: "Fila" },
 ]
 
-function ProductTile({ product }: { product: Product }) {
+function ProductTile({ product, onNavigate }: { product: Product; onNavigate: () => void }) {
   return (
-    <Link href={`/shop/${product.slug}`} className="flex flex-col gap-2">
+    <Link href={`/shop/${product.slug}`} onClick={onNavigate} className="flex flex-col gap-2">
       <div className="relative aspect-square bg-secondary">
         <Image src={product.imageUrl} alt={product.imageAlt} fill className="object-cover" sizes="200px" />
       </div>
@@ -102,7 +102,7 @@ export function SearchPanel() {
     <Dialog.Root open={searchOpen} onOpenChange={setSearchOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/40 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
-        <Dialog.Content className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col bg-background shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right">
+        <Dialog.Content className="fixed right-0 top-0 z-50 flex h-full w-[80vw] max-w-sm flex-col bg-background shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right">
           <div className="flex items-center justify-between border-b border-border p-5">
             <Dialog.Title className="text-lg font-bold">Search</Dialog.Title>
             <Dialog.Close aria-label="Close search" onClick={close}>
@@ -150,7 +150,7 @@ export function SearchPanel() {
                   ) : (
                     <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-6">
                       {results.map((product) => (
-                        <ProductTile key={product.id} product={product} />
+                        <ProductTile key={product.id} product={product} onNavigate={close} />
                       ))}
                     </div>
                   )}
@@ -169,7 +169,7 @@ export function SearchPanel() {
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Popular products</p>
                   <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-6">
                     {popular.map((product) => (
-                      <ProductTile key={product.id} product={product} />
+                      <ProductTile key={product.id} product={product} onNavigate={close} />
                     ))}
                   </div>
                 </>

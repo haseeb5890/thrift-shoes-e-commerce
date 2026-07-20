@@ -132,3 +132,16 @@ export async function updateProduct(formData: FormData) {
   revalidatePath("/shop")
   redirect("/admin/products")
 }
+
+export async function updateProductPrice(productId: string, price: number) {
+  await requireAdminAction()
+
+  if (!Number.isInteger(price) || price <= 0) return { error: "Enter a valid price." }
+
+  await db.update(products).set({ price, updatedAt: new Date() }).where(eq(products.id, productId))
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/products")
+  revalidatePath("/shop")
+  return { success: true }
+}
