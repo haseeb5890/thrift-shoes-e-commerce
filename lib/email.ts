@@ -44,7 +44,7 @@ function itemRowsHtml(items: OrderEmailItem[]) {
     .join("")
 }
 
-function totalsHtml(params: { subtotal: number; shippingFee: number; total: number }) {
+function totalsHtml(params: { subtotal: number; shippingFee: number; total: number; discountAmount?: number; promoCode?: string | null }) {
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family: ${BODY_FONT}; font-size: 13px; color: ${COLORS.foreground};">
       <tr>
@@ -55,6 +55,14 @@ function totalsHtml(params: { subtotal: number; shippingFee: number; total: numb
         <td style="padding: 4px 0; color: ${COLORS.muted};">Shipping</td>
         <td style="padding: 4px 0; text-align: right;">${formatPKR(params.shippingFee)}</td>
       </tr>
+      ${
+        params.discountAmount
+          ? `<tr>
+        <td style="padding: 4px 0; color: ${COLORS.muted};">Discount${params.promoCode ? ` (${params.promoCode})` : ""}</td>
+        <td style="padding: 4px 0; text-align: right;">-${formatPKR(params.discountAmount)}</td>
+      </tr>`
+          : ""
+      }
       <tr>
         <td style="padding: 10px 0 0; font-weight: 700; font-size: 16px; border-top: 1px solid ${COLORS.border};">Total</td>
         <td style="padding: 10px 0 0; font-weight: 700; font-size: 16px; text-align: right; border-top: 1px solid ${COLORS.border};">${formatPKR(params.total)}</td>
@@ -143,6 +151,8 @@ export async function sendOrderConfirmationEmail(params: {
   subtotal: number
   shippingFee: number
   total: number
+  discountAmount?: number
+  promoCode?: string | null
   confirmationToken: string
 }) {
   const confirmUrl = `${SITE_URL}/order-confirm?token=${params.confirmationToken}`
@@ -181,6 +191,8 @@ export async function sendOrderConfirmedEmail(params: {
   subtotal: number
   shippingFee: number
   total: number
+  discountAmount?: number
+  promoCode?: string | null
 }) {
   const trackUrl = `${SITE_URL}/track`
 

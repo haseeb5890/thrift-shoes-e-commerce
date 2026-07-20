@@ -49,7 +49,7 @@ export default async function TrackPage() {
                 {order.status !== "cancelled" && order.status !== "delivered" && (
                   <div>
                     <p className="text-muted-foreground">Delivery</p>
-                    <p className="font-bold text-primary">{getDeliveryWindow(new Date(order.createdAt))}</p>
+                    <p className="font-bold text-primary">Delivered by: {getDeliveryWindow(new Date(order.createdAt))}</p>
                   </div>
                 )}
                 <div>

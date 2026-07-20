@@ -2,9 +2,11 @@ import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { profiles } from "@/lib/db/schema"
 
-// Accepts either the top-level `db` or a `tx` handle from db.transaction(...) —
-// both expose the same query-builder methods used here.
-type Executor = typeof db
+// Accepts either the top-level `db` or a `tx` handle from db.transaction(...) — both expose
+// the same query-builder methods used here. The tx branch is derived from db.transaction's own
+// callback signature (rather than a separate NodePgTransaction import) so it can never drift
+// out of sync with db's actual schema generic.
+type Executor = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0]
 
 export async function findProfileByEmail(executor: Executor, email: string) {
   const [profile] = await executor.select().from(profiles).where(eq(profiles.email, email))

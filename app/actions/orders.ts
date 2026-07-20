@@ -4,7 +4,7 @@ import { z } from "zod"
 import { and, desc, eq, gt, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { orderItems, orders, products } from "@/lib/db/schema"
+import { orderItems, orders, products, promoCodes } from "@/lib/db/schema"
 import { getSessionUser, getSessionProfile, requireAdminAction } from "@/lib/auth-helpers"
 import { getOrCreateProfile } from "@/lib/profiles"
 import { ORDER_STATUSES } from "@/lib/order-status"
@@ -15,7 +15,7 @@ import { text } from "stream/consumers"
 
 const CONFIRMATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
-const checkoutSchema = z.object({ customerName: z.string().min(2), email: z.email(), phone: z.string().regex(/^03\d{9}$/), city: z.string().min(2), addressLine: z.string().min(8), postalCode: z.string().optional(), paymentMethod: z.enum(["cod", "bank"]), notes: z.string().optional(), items: z.array(z.object({ id: z.string(), slug: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1), shippingFee: z.number().int().nonnegative() })
+const checkoutSchema = z.object({ customerName: z.string().min(2), email: z.email(), phone: z.string().regex(/^03\d{9}$/), city: z.string().min(2), addressLine: z.string().min(8), postalCode: z.string().optional(), paymentMethod: z.enum(["cod", "bank"]), notes: z.string().optional(), items: z.array(z.object({ id: z.string(), slug: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1), shippingFee: z.number().int().nonnegative(), promoCode: z.string().optional() })
 
 export async function createOrder(input: z.infer<typeof checkoutSchema>): Promise<{ error: string } | { orderNumber: string; total: number; paymentMethod: "cod" | "bank" }> {
   let data: z.infer<typeof checkoutSchema>
@@ -31,6 +31,8 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
   const subtotal = data.items.reduce((sum, item) => sum + item.price, 0)
   const confirmationToken = crypto.randomUUID()
   const confirmationExpiresAt = new Date(Date.now() + CONFIRMATION_TOKEN_TTL_MS)
+  let discountAmount = 0
+  let appliedPromoCode: string | null = null
 
   try {
     await db.transaction(async (tx) => {
@@ -53,40 +55,67 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
           .returning({ id: products.id })
         if (!claimed) throw new Error(`SOLD_OUT:${item.name} (${item.size})`)
       }
-      await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: "pending", status: "placed", isNew: true, subtotal, shippingFee: data.shippingFee, total: subtotal + data.shippingFee, notes: data.notes, confirmationToken, confirmationExpiresAt })
+
+      // Same atomic "claim under a WHERE guard" pattern as the stock decrement above — the
+      // UPDATE only succeeds if a ticket is still available, so two concurrent checkouts can
+      // never both redeem the last one.
+      if (data.promoCode?.trim()) {
+        const normalizedCode = data.promoCode.trim().toUpperCase()
+        const [claimed] = await tx
+          .update(promoCodes)
+          .set({ usedCount: sql`${promoCodes.usedCount} + 1` })
+          .where(and(eq(promoCodes.code, normalizedCode), eq(promoCodes.isActive, true), sql`${promoCodes.usedCount} < ${promoCodes.maxUses}`))
+          .returning({ discountPercent: promoCodes.discountPercent })
+        if (!claimed) throw new Error(`PROMO_INVALID:${normalizedCode}`)
+        discountAmount = Math.round((subtotal * claimed.discountPercent) / 100)
+        appliedPromoCode = normalizedCode
+      }
+
+      const total = subtotal + data.shippingFee - discountAmount
+      await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: "pending", status: "placed", isNew: true, subtotal, shippingFee: data.shippingFee, promoCode: appliedPromoCode, discountAmount, total, notes: data.notes, confirmationToken, confirmationExpiresAt })
       await tx.insert(orderItems).values(data.items.map((item) => ({ id: crypto.randomUUID(), orderId: id, productId: item.id, productSlug: item.slug, productName: item.name, size: item.size, quantity: 1, unitPrice: item.price, imageUrl: item.imageUrl })))
     })
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("SOLD_OUT:")) {
       return { error: `${err.message.slice(9)} just sold out — remove it from your bag and try again.` }
     }
+    if (err instanceof Error && err.message.startsWith("PROMO_INVALID:")) {
+      return { error: "That promo code is invalid or has been fully redeemed. Remove it and try again." }
+    }
     return { error: "We couldn't reach our servers to place your order. Please check your connection and try again in a moment." }
   }
+
+  const total = subtotal + data.shippingFee - discountAmount
 
   revalidatePath("/shop")
   revalidatePath("/admin/orders")
 
-  await sendOrderConfirmationEmail({
-    to: data.email,
-    customerName: data.customerName,
-    orderNumber,
-    items: data.items.map((item) => ({ name: item.name, size: item.size, price: item.price, imageUrl: item.imageUrl })),
-    subtotal,
-    shippingFee: data.shippingFee,
-    total: subtotal + data.shippingFee,
-    confirmationToken,
-  })
+  // The order is already committed — email + Slack are side notifications, not required for
+  // the response, so run them concurrently instead of stacking their latency onto the checkout.
+  await Promise.all([
+    sendOrderConfirmationEmail({
+      to: data.email,
+      customerName: data.customerName,
+      orderNumber,
+      items: data.items.map((item) => ({ name: item.name, size: item.size, price: item.price, imageUrl: item.imageUrl })),
+      subtotal,
+      shippingFee: data.shippingFee,
+      total,
+      discountAmount,
+      promoCode: appliedPromoCode,
+      confirmationToken,
+    }),
+    notifyNewOrder({
+      orderNumber,
+      customerName: data.customerName,
+      city: data.city,
+      total,
+      paymentMethod: data.paymentMethod,
+      items: data.items.map((item) => ({ slug: item.slug, name: item.name, size: item.size, imageUrl: item.imageUrl })),
+    }),
+  ])
 
-  await notifyNewOrder({
-    orderNumber,
-    customerName: data.customerName,
-    city: data.city,
-    total: subtotal + data.shippingFee,
-    paymentMethod: data.paymentMethod,
-    items: data.items.map((item) => ({ slug: item.slug, name: item.name, size: item.size, imageUrl: item.imageUrl })),
-  })
-
-  return { orderNumber, total: subtotal + data.shippingFee, paymentMethod: data.paymentMethod }
+  return { orderNumber, total, paymentMethod: data.paymentMethod }
 }
 
 const CANCELLABLE_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours
@@ -106,7 +135,7 @@ export async function cancelOrderAsCustomer(orderId: string): Promise<{ error: s
   if (!profile) return { error: "You must be signed in to cancel an order." }
 
   const [order] = await db
-    .select({ id: orders.id, userId: orders.userId, status: orders.status, createdAt: orders.createdAt, orderNumber: orders.orderNumber, customerName: orders.customerName, email: orders.email })
+    .select({ id: orders.id, userId: orders.userId, status: orders.status, createdAt: orders.createdAt, orderNumber: orders.orderNumber, customerName: orders.customerName, email: orders.email, promoCode: orders.promoCode })
     .from(orders)
     .where(eq(orders.id, orderId))
   if (!order) return { error: "Order not found." }
@@ -133,6 +162,9 @@ export async function cancelOrderAsCustomer(orderId: string): Promise<{ error: s
       const items = await tx.select({ productId: orderItems.productId }).from(orderItems).where(eq(orderItems.orderId, orderId))
       for (const item of items) {
         await tx.update(products).set({ stock: sql`${products.stock} + 1` }).where(eq(products.id, item.productId))
+      }
+      if (order.promoCode) {
+        await tx.update(promoCodes).set({ usedCount: sql`${promoCodes.usedCount} - 1` }).where(eq(promoCodes.code, order.promoCode))
       }
     })
   } catch (err) {
@@ -194,6 +226,8 @@ export async function updateOrderStatus(
       subtotal: orders.subtotal,
       shippingFee: orders.shippingFee,
       total: orders.total,
+      promoCode: orders.promoCode,
+      discountAmount: orders.discountAmount,
     })
     .from(orders)
     .where(eq(orders.id, orderId))
@@ -225,6 +259,9 @@ export async function updateOrderStatus(
       for (const item of items) {
         await tx.update(products).set({ stock: sql`${products.stock} + 1` }).where(eq(products.id, item.productId))
       }
+      if (existing.promoCode) {
+        await tx.update(promoCodes).set({ usedCount: sql`${promoCodes.usedCount} - 1` }).where(eq(promoCodes.code, existing.promoCode))
+      }
     }
   })
 
@@ -233,16 +270,20 @@ export async function updateOrderStatus(
       .select({ slug: orderItems.productSlug, name: orderItems.productName, size: orderItems.size, imageUrl: orderItems.imageUrl, unitPrice: orderItems.unitPrice })
       .from(orderItems)
       .where(eq(orderItems.orderId, orderId))
-    await notifyOrderConfirmed({ orderNumber: existing.orderNumber, customerName: existing.customerName, via: "admin", items: confirmedItems })
-    await sendOrderConfirmedEmail({
-      to: existing.email,
-      customerName: existing.customerName,
-      orderNumber: existing.orderNumber,
-      items: confirmedItems.map((item) => ({ name: item.name, size: item.size, price: item.unitPrice, imageUrl: item.imageUrl })),
-      subtotal: existing.subtotal,
-      shippingFee: existing.shippingFee,
-      total: existing.total,
-    })
+    await Promise.all([
+      notifyOrderConfirmed({ orderNumber: existing.orderNumber, customerName: existing.customerName, via: "admin", items: confirmedItems }),
+      sendOrderConfirmedEmail({
+        to: existing.email,
+        customerName: existing.customerName,
+        orderNumber: existing.orderNumber,
+        items: confirmedItems.map((item) => ({ name: item.name, size: item.size, price: item.unitPrice, imageUrl: item.imageUrl })),
+        subtotal: existing.subtotal,
+        shippingFee: existing.shippingFee,
+        total: existing.total,
+        discountAmount: existing.discountAmount,
+        promoCode: existing.promoCode,
+      }),
+    ])
   }
 
   if (status === "cancelled" && existing.status !== "cancelled") {
