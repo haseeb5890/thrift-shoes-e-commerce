@@ -36,7 +36,7 @@ export function CancelOrderButton({ orderId }: { orderId: string }) {
 
   if (confirming) {
     return (
-      <div className="flex items-center gap-3">
+      <div className="animate-in fade-in-0 slide-in-from-left-1 flex items-center gap-3 duration-150">
         <span className="text-xs text-muted-foreground">Cancel this order?</span>
         <button onClick={handleCancel} disabled={isPending} className="text-xs font-bold uppercase tracking-wider text-destructive underline disabled:opacity-50">
           Yes, cancel

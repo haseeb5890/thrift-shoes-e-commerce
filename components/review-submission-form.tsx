@@ -76,7 +76,7 @@ export function ReviewSubmissionForm() {
                 aria-label={`${star} star${star > 1 ? "s" : ""}`}
                 className="p-0.5"
               >
-                <Star size={26} className={(hoverRating || rating) >= star ? "fill-primary text-primary" : "text-muted-foreground"} />
+                <Star size={26} className={(hoverRating || rating) >= star ? "fill-amber-400 text-amber-400" : "text-muted-foreground"} />
               </button>
             ))}
           </div>

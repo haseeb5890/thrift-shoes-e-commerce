@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ExternalLink } from "lucide-react"
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orderItems, orders } from "@/lib/db/schema"
@@ -49,7 +49,20 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
         </div>
         <div className="bg-secondary p-4">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tracking</p>
-          <p className="mt-1 text-sm font-bold">{order.trackingNumber ?? "Assigned after dispatch"}</p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-sm font-bold">{order.trackingNumber ?? "Assigned after dispatch"}</p>
+            {order.trackingNumber && (
+              <a
+                href={`https://parcelsapp.com/en/tracking/${encodeURIComponent(order.trackingNumber)}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Track shipment on courier site"
+                className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary underline"
+              >
+                Track <ExternalLink size={13} />
+              </a>
+            )}
+          </div>
         </div>
       </div>
 

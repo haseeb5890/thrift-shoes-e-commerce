@@ -88,7 +88,7 @@ export default function AdminReviewsPage() {
                       <p className="text-xs text-muted-foreground">{review.submittedEmail}</p>
                       <div className="mt-1 flex gap-0.5">
                         {Array.from({ length: 5 }, (_, i) => (
-                          <Star key={i} size={13} className={i < review.rating ? "fill-primary text-primary" : "text-border"} />
+                          <Star key={i} size={13} className={i < review.rating ? "fill-amber-400 text-amber-400" : "text-border"} />
                         ))}
                       </div>
                     </div>
@@ -150,7 +150,7 @@ export default function AdminReviewsPage() {
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button type="button" key={star} onClick={() => setRating(star)}>
-                  <Star size={22} className={rating >= star ? "fill-primary text-primary" : "text-muted-foreground"} />
+                  <Star size={22} className={rating >= star ? "fill-amber-400 text-amber-400" : "text-muted-foreground"} />
                 </button>
               ))}
             </div>

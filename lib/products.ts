@@ -3,7 +3,7 @@ import { db } from "@/lib/db"
 import { products, productMedia } from "@/lib/db/schema"
 import { fallbackProducts, type Product } from "@/lib/store-data"
 
-export const PAGE_SIZE = 12
+export const PAGE_SIZE = 18
 
 export type SortOption = "latest" | "price-asc" | "price-desc"
 export type ViewOption = "grid" | "list"
@@ -33,6 +33,8 @@ export type FacetCounts = {
   sizes: { value: string; count: number }[]
   brands: { value: string; count: number }[]
   conditions: { value: string; count: number }[]
+  genders: { value: string; count: number }[]
+  priceBounds: { min: number; max: number }
 }
 
 function parseList(value?: string): string[] {
@@ -185,22 +187,23 @@ export async function getFacetedFilterCounts(filters: ProductFilters = {}): Prom
   const conditions = parseList(filters.condition)
 
   try {
-    function otherConditions(exclude: "size" | "brand" | "condition"): SQL {
+    function otherConditions(exclude: "size" | "brand" | "condition" | "gender"): SQL {
       const list: SQL[] = [eq(products.isActive, true), sql`${products.stock} > 0`]
       if (exclude !== "size" && sizes.length) list.push(inArray(products.size, sizes))
       if (exclude !== "brand" && brands.length) list.push(inArray(products.brand, brands))
       if (exclude !== "condition" && conditions.length) list.push(inArray(products.condition, conditions))
+      if (exclude !== "gender" && filters.gender) list.push(eq(products.gender, filters.gender))
       if (filters.category) list.push(eq(products.category, filters.category))
-      if (filters.gender) list.push(eq(products.gender, filters.gender))
       if (filters.minPrice) list.push(gte(products.price, Number(filters.minPrice)))
       if (filters.maxPrice) list.push(lte(products.price, Number(filters.maxPrice)))
       return and(...list)!
     }
 
-    const [sizeUniverse, brandUniverse, conditionUniverse, sizeCounts, brandCounts, conditionCounts] = await Promise.all([
+    const [sizeUniverse, brandUniverse, conditionUniverse, genderUniverse, sizeCounts, brandCounts, conditionCounts, genderCounts, priceRow] = await Promise.all([
       db.selectDistinct({ value: products.size }).from(products).where(eq(products.isActive, true)),
       db.selectDistinct({ value: products.brand }).from(products).where(eq(products.isActive, true)),
       db.selectDistinct({ value: products.condition }).from(products).where(eq(products.isActive, true)),
+      db.selectDistinct({ value: products.gender }).from(products).where(eq(products.isActive, true)),
       db.select({ value: products.size, count: sql<number>`count(*)::int` }).from(products).where(otherConditions("size")).groupBy(products.size),
       db.select({ value: products.brand, count: sql<number>`count(*)::int` }).from(products).where(otherConditions("brand")).groupBy(products.brand),
       db
@@ -208,6 +211,8 @@ export async function getFacetedFilterCounts(filters: ProductFilters = {}): Prom
         .from(products)
         .where(otherConditions("condition"))
         .groupBy(products.condition),
+      db.select({ value: products.gender, count: sql<number>`count(*)::int` }).from(products).where(otherConditions("gender")).groupBy(products.gender),
+      db.select({ min: sql<number>`min(${products.price})::int`, max: sql<number>`max(${products.price})::int` }).from(products).where(eq(products.isActive, true)),
     ])
 
     function merge(universe: { value: string }[], counts: { value: string; count: number }[]) {
@@ -219,14 +224,17 @@ export async function getFacetedFilterCounts(filters: ProductFilters = {}): Prom
       sizes: merge(sizeUniverse, sizeCounts),
       brands: merge(brandUniverse, brandCounts),
       conditions: merge(conditionUniverse, conditionCounts),
+      genders: merge(genderUniverse, genderCounts),
+      priceBounds: { min: priceRow[0]?.min ?? 0, max: priceRow[0]?.max ?? 0 },
     }
   } catch {
-    function tally(key: "size" | "brand" | "condition") {
+    function tally(key: "size" | "brand" | "condition" | "gender") {
       const counts = new Map<string, number>()
       for (const p of fallbackProducts) counts.set(p[key], (counts.get(p[key]) ?? 0) + (p.stock > 0 ? 1 : 0))
       return Array.from(counts.entries()).map(([value, count]) => ({ value, count })).sort((a, b) => a.value.localeCompare(b.value))
     }
-    return { sizes: tally("size"), brands: tally("brand"), conditions: tally("condition") }
+    const prices = fallbackProducts.map((p) => p.price)
+    return { sizes: tally("size"), brands: tally("brand"), conditions: tally("condition"), genders: tally("gender"), priceBounds: { min: Math.min(...prices), max: Math.max(...prices) } }
   }
 }
 

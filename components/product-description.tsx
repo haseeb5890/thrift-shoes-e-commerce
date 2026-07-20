@@ -10,18 +10,12 @@ const GENERIC_POINTS = [
 
 export function ProductDescription({ description }: { description?: string | null }) {
   if (description && description.trim()) {
-    return (
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest">Description</p>
-        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
-    )
+    return <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">{description}</p>
   }
 
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-widest">Description</p>
-      <p className="mt-2 text-sm font-semibold text-foreground">Pre-owned (pre-loved) item.</p>
+      <p className="text-sm font-semibold text-foreground">Pre-owned (pre-loved) item.</p>
       <ul className="mt-3 flex flex-col gap-2.5">
         {GENERIC_POINTS.map((point) => (
           <li key={point.text} className="flex items-start gap-2.5 text-sm leading-6 text-muted-foreground">

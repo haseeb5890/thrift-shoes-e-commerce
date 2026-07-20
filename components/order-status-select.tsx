@@ -79,7 +79,7 @@ export function OrderStatusSelect({ orderId, status, trackingNumber }: { orderId
       </select>
 
       {pendingStatus && (
-        <div className="flex flex-col items-end gap-2 border border-border bg-card p-3">
+        <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col items-end gap-2 border border-border bg-card p-3 duration-150">
           {needsTracking && (
             <input
               type="text"

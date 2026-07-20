@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
-import Link from "next/link"
-import { ProductCard } from "@/components/product-card"
 import { ShopControls } from "@/components/shop-controls"
 import { FilterAccordionSections } from "@/components/filter-accordion-sections"
+import { ProductGrid } from "@/components/product-grid"
 import { getFacetedFilterCounts, getProducts, type ProductFilters } from "@/lib/products"
 
 export const metadata: Metadata = { title: "Shop all shoes" }
@@ -10,18 +9,8 @@ export const metadata: Metadata = { title: "Shop all shoes" }
 export default async function ShopPage({ searchParams }: { searchParams: Promise<ProductFilters> }) {
   const filters = await searchParams
   const [result, facets] = await Promise.all([getProducts(filters), getFacetedFilterCounts(filters)])
-  const { products, total, page, totalPages } = result
+  const { products, total, totalPages } = result
   const view = filters.view === "list" ? "list" : "grid"
-
-  function pageHref(targetPage: number) {
-    const params = new URLSearchParams()
-    for (const [key, value] of Object.entries(filters)) {
-      if (value && key !== "page") params.set(key, String(value))
-    }
-    if (targetPage > 1) params.set("page", String(targetPage))
-    const qs = params.toString()
-    return `/shop${qs ? `?${qs}` : ""}`
-  }
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
@@ -41,45 +30,15 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
       <ShopControls facets={facets} />
 
       <div className="flex flex-col gap-8 py-6 md:flex-row md:gap-10">
-        <aside className="hidden md:block md:w-64 md:shrink-0">
+        <aside className="hidden md:block md:w-48 md:shrink-0">
           <FilterAccordionSections facets={facets} />
         </aside>
 
         <div className="flex-1">
-          <div className={view === "list" ? "flex flex-col gap-6" : "grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 md:gap-6"}>
-            {products.length === 0 ? (
-              <p className="col-span-full py-16 text-center text-muted-foreground">No pairs match these filters yet.</p>
-            ) : (
-              products.map((product) => <ProductCard key={product.id} product={product} />)
-            )}
-          </div>
-
-          {totalPages > 1 && (
-            <nav className="mt-12 flex items-center justify-center gap-2" aria-label="Pagination">
-              <Link
-                href={pageHref(Math.max(1, page - 1))}
-                aria-disabled={page <= 1}
-                className={`flex h-10 min-w-10 items-center justify-center border border-border px-3 text-xs font-bold uppercase tracking-wider ${page <= 1 ? "pointer-events-none opacity-40" : "hover:border-foreground"}`}
-              >
-                Prev
-              </Link>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <Link
-                  key={p}
-                  href={pageHref(p)}
-                  className={`flex h-10 min-w-10 items-center justify-center border px-3 text-xs font-bold ${p === page ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground"}`}
-                >
-                  {p}
-                </Link>
-              ))}
-              <Link
-                href={pageHref(Math.min(totalPages, page + 1))}
-                aria-disabled={page >= totalPages}
-                className={`flex h-10 min-w-10 items-center justify-center border border-border px-3 text-xs font-bold uppercase tracking-wider ${page >= totalPages ? "pointer-events-none opacity-40" : "hover:border-foreground"}`}
-              >
-                Next
-              </Link>
-            </nav>
+          {products.length === 0 ? (
+            <p className="py-16 text-center text-muted-foreground">No pairs match these filters yet.</p>
+          ) : (
+            <ProductGrid initialProducts={products} filters={filters} totalPages={totalPages} view={view} />
           )}
         </div>
       </div>

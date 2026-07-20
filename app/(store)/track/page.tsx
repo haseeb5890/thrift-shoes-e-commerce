@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { ExternalLink } from "lucide-react"
 import { getSessionProfile } from "@/lib/auth-helpers"
 import { getOrdersForProfile } from "@/app/actions/tracking"
 import { TrackForm } from "@/components/track-form"
@@ -47,7 +48,20 @@ export default async function TrackPage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Tracking</p>
-                  <p className="font-bold">{order.trackingNumber ?? "Assigned after dispatch"}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold">{order.trackingNumber ?? "Assigned after dispatch"}</p>
+                    {order.trackingNumber && (
+                      <a
+                        href={`https://parcelsapp.com/en/tracking/${encodeURIComponent(order.trackingNumber)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Track shipment on courier site"
+                        className="text-primary"
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Placed</p>

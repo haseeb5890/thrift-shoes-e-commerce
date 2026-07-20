@@ -1,49 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
-import { CONDITIONS } from "@/lib/product-options"
+import { CONDITION_GRADES } from "@/lib/condition-grades"
 
 export const metadata: Metadata = { title: "Condition guide" }
-
-type Grade = {
-  code: string
-  label: (typeof CONDITIONS)[number]
-  summary: string
-  details: string[]
-}
-
-const GRADES: Grade[] = [
-  {
-    code: "01",
-    label: "Excellent",
-    summary: "Looks and feels brand new. Only the closest inspection reveals it's pre-owned.",
-    details: [
-      "No visible creasing, scuffing, or discoloration",
-      "Sole and tread essentially full, freshly deep-cleaned by us before listing",
-      "As close to a fresh pair as thrift gets",
-    ],
-  },
-  {
-    code: "02",
-    label: "Very Good",
-    summary: "Gently worn with only minor, honest signs of use. Clean and ready to wear.",
-    details: [
-      "Light creasing or a small cosmetic mark at most",
-      "No structural issues — upper, sole, and lining all sound",
-      "Sanitized and conditioned before photographing",
-    ],
-  },
-  {
-    code: "03",
-    label: "Average",
-    summary: "Comfortable, well-loved pairs with visible wear from regular use — priced to match.",
-    details: [
-      "Noticeable creasing, scuffing, or fading consistent with regular wear",
-      "Still structurally solid and comfortable to wear",
-      "Condition notes on the product page always detail exactly what to expect",
-    ],
-  },
-]
 
 export default function ConditionGuidePage() {
   return (
@@ -53,25 +13,27 @@ export default function ConditionGuidePage() {
         One pair, one honest grade.
       </h1>
       <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground">
-        Every pair on ReLace goes through the same 30+ point inspection before it's listed. We don't use stock
-        photos or generic descriptions — the grade below, and the condition notes on each product page, describe
-        the exact pair you'll receive.
+        Every pair on Prime Soles goes through the same 30+ point inspection before it's listed. We don't use stock
+        photos or generic descriptions — the grade on each product page describes exactly what to expect from that
+        exact pair.
       </p>
 
       <div className="mt-12 flex flex-col divide-y divide-border border-y border-border">
-        {GRADES.map((grade) => (
+        {CONDITION_GRADES.map((grade) => (
           <div key={grade.label} className="grid gap-4 py-8 md:grid-cols-[auto_1fr] md:gap-10">
             <div className="flex items-start gap-4 md:w-40">
               <span className="font-serif text-3xl font-black text-primary">{grade.code}</span>
-              <Link href={`/shop?condition=${encodeURIComponent(grade.label)}`} className="group font-serif text-2xl font-black leading-tight underline decoration-transparent underline-offset-4 transition-colors hover:decoration-primary md:hidden">
-                {grade.label}
+              <Link href={`/shop?condition=${encodeURIComponent(grade.label)}`} className="group md:hidden">
+                <h2 className="font-serif text-2xl font-black leading-tight underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-primary">
+                  {grade.label}
+                </h2>
               </Link>
             </div>
             <div>
               <Link href={`/shop?condition=${encodeURIComponent(grade.label)}`} className="group hidden items-baseline gap-3 md:flex">
-                <span className="font-serif text-3xl font-black leading-tight underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-primary">
+                <h2 className="font-serif text-3xl font-black leading-tight underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-primary">
                   {grade.label}
-                </span>
+                </h2>
                 <span className="text-xs font-bold uppercase tracking-wider text-primary opacity-0 transition-opacity group-hover:opacity-100">
                   Shop this grade →
                 </span>

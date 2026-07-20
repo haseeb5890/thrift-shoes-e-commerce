@@ -16,7 +16,7 @@ export function HomePage({ products }: { products: Product[] }) {
 
   return <>
     <section className="relative overflow-hidden border-b border-border bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-4">
+      <div className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-24">
         <div className="grid items-center gap-6 md:grid-cols-[1fr_1.1fr_1fr]">
           <div className="text-center md:text-left">
             <h1 className="text-balance text-5xl font-black leading-[1.05] tracking-tight md:text-6xl">The <span className="text-primary">Prime Soles</span> edit of hand-graded pre-owned sneakers.</h1>

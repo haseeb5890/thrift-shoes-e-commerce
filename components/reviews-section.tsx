@@ -29,7 +29,7 @@ export async function ReviewsSection() {
             )}
             <div className="flex gap-0.5">
               {Array.from({ length: 5 }, (_, i) => (
-                <Star key={i} size={15} className={i < review.rating ? "fill-primary text-primary" : "text-border"} />
+                <Star key={i} size={15} className={i < review.rating ? "fill-amber-400 text-amber-400" : "text-border"} />
               ))}
             </div>
             <p className="mt-3 flex-1 text-sm leading-6 text-foreground">{review.body}</p>

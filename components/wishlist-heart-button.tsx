@@ -28,7 +28,7 @@ export function WishlistHeartButton({ product, className = "" }: { product: Prod
       aria-pressed={active}
       className={`flex size-9 items-center justify-center rounded-full bg-background/90 backdrop-blur transition-transform hover:scale-105 ${className}`}
     >
-      <Heart size={17} className={active ? "fill-primary text-primary" : "text-foreground"} />
+      <Heart size={17} className={active ? "fill-pink-500 text-pink-500" : "text-foreground"} />
     </button>
   )
 }
