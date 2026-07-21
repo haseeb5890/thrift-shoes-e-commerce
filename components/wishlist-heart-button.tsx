@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { useWishlist } from "@/components/wishlist-provider"
 import type { Product } from "@/lib/store-data"
 
-export function WishlistHeartButton({ product, className = "" }: { product: Product; className?: string }) {
+export function WishlistHeartButton({ product, className, iconClassName = "" }: { product: Product; className?: string; iconClassName?: string }) {
   const { isWishlisted, toggleWishlist, isSignedIn } = useWishlist()
   const active = isWishlisted(product.id)
 
@@ -26,9 +26,9 @@ export function WishlistHeartButton({ product, className = "" }: { product: Prod
       onClick={handleClick}
       aria-label={active ? "Remove from wishlist" : "Save to wishlist"}
       aria-pressed={active}
-      className={`flex size-9 items-center justify-center rounded-full bg-background/90 backdrop-blur transition-transform hover:scale-105 ${className}`}
+      className={className ?? "flex size-9 items-center justify-center rounded-full bg-background/90 backdrop-blur transition-transform hover:scale-105"}
     >
-      <Heart size={17} className={active ? "fill-pink-500 text-pink-500" : "text-foreground"} />
+      <Heart size={17} className={`${active ? "fill-pink-500 text-pink-500" : "text-foreground"} ${iconClassName}`} />
     </button>
   )
 }

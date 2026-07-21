@@ -12,7 +12,9 @@ function assertMutable(currentUserId: string, currentUserEmail: string | undefin
 export async function listUsers() {
   await requireAdminAction()
   const supabase = createAdminClient()
-  const { data, error } = await supabase.auth.admin.listUsers()
+  // Supabase defaults to 50 users per page — without this, accounts beyond the first page
+  // would silently stop showing up here as the user base grows.
+  const { data, error } = await supabase.auth.admin.listUsers({ perPage: 1000 })
   if (error) throw new Error(error.message)
   return data.users
     .map((user) => ({

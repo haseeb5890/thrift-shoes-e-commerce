@@ -11,7 +11,7 @@ import { products, productMedia } from "@/lib/db/schema"
 const productSchema = z.object({
   name: z.string().min(2),
   brand: z.string().min(1),
-  category: z.string().min(1),
+  category: z.array(z.string()).min(1),
   gender: z.string().min(1),
   size: z.string().min(1),
   condition: z.string().min(1),
@@ -27,7 +27,7 @@ function parseProductFields(formData: FormData) {
   return productSchema.parse({
     name: formData.get("name"),
     brand: formData.get("brand"),
-    category: formData.get("category"),
+    category: formData.getAll("category"),
     gender: formData.get("gender"),
     size: formData.get("size"),
     condition: formData.get("condition"),

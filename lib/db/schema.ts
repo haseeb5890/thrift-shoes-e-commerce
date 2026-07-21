@@ -1,11 +1,14 @@
 import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
 
 export const products = pgTable(
   "products",
-  { id: text("id").primaryKey(), slug: text("slug").notNull().unique(), name: text("name").notNull(), brand: text("brand").notNull(), category: text("category").notNull(), gender: text("gender").notNull(), size: text("size").notNull(), condition: text("condition").notNull(), description: text("description"), price: integer("price").notNull(), compareAtPrice: integer("compare_at_price"), imageUrl: text("image_url").notNull(), imageAlt: text("image_alt").notNull(), color: text("color").notNull(), isFeatured: boolean("is_featured").notNull().default(false), isActive: boolean("is_active").notNull().default(true), stock: integer("stock").notNull().default(1), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow() },
+  // category is an array so a pair can be tagged into more than one type (e.g. both Running
+  // and Trail) and show up under every matching filter, instead of picking a single bucket.
+  { id: text("id").primaryKey(), slug: text("slug").notNull().unique(), name: text("name").notNull(), brand: text("brand").notNull(), category: text("category").array().notNull().default(sql`'{}'::text[]`), gender: text("gender").notNull(), size: text("size").notNull(), condition: text("condition").notNull(), description: text("description"), price: integer("price").notNull(), compareAtPrice: integer("compare_at_price"), imageUrl: text("image_url").notNull(), imageAlt: text("image_alt").notNull(), color: text("color").notNull(), isFeatured: boolean("is_featured").notNull().default(false), isActive: boolean("is_active").notNull().default(true), stock: integer("stock").notNull().default(1), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow() },
   (table) => ({
     activeStockIdx: index("products_active_stock_idx").on(table.isActive, table.stock),
-    categoryIdx: index("products_category_idx").on(table.category),
+    categoryIdx: index("products_category_idx").using("gin", table.category),
     genderIdx: index("products_gender_idx").on(table.gender),
     brandIdx: index("products_brand_idx").on(table.brand),
     sizeIdx: index("products_size_idx").on(table.size),

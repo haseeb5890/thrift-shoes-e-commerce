@@ -50,7 +50,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-serif text-5xl font-black">Orders.</h1>
+        <h1 className="font-serif text-3xl font-black md:text-5xl">Orders.</h1>
         <ExportCsvButton target={{ type: "orders" }} filename={`orders-${new Date().toISOString().slice(0, 10)}.csv`} />
       </div>
 
@@ -71,14 +71,14 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       </form>
 
       <div className="mt-6 overflow-x-auto bg-background p-5">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-130 text-left text-sm md:min-w-225">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr>
               <th className="px-3 py-3">Order</th>
               <th className="px-3 py-3">Customer</th>
-              <th className="px-3 py-3">Address</th>
-              <th className="px-3 py-3">Products</th>
-              <th className="px-3 py-3">Payment</th>
+              <th className="hidden px-3 py-3 md:table-cell">Address</th>
+              <th className="hidden px-3 py-3 md:table-cell">Products</th>
+              <th className="hidden px-3 py-3 md:table-cell">Payment</th>
               <th className="px-3 py-3">Total</th>
               <th className="px-3 py-3 text-right">Status</th>
             </tr>
@@ -102,11 +102,11 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                       {order.customerName}
                       <p className="text-xs text-muted-foreground">{order.email}</p>
                     </td>
-                    <td className="px-3 py-4 text-xs text-muted-foreground">
+                    <td className="hidden px-3 py-4 text-xs text-muted-foreground md:table-cell">
                       {order.addressLine}
                       <p>{order.city}{order.postalCode ? `, ${order.postalCode}` : ""}</p>
                     </td>
-                    <td className="px-3 py-4 text-xs">
+                    <td className="hidden px-3 py-4 text-xs md:table-cell">
                       {orderItemRows.length === 0
                         ? <span className="text-muted-foreground">—</span>
                         : (
@@ -118,7 +118,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                           </div>
                         )}
                     </td>
-                    <td className="px-3 py-4 capitalize">{order.paymentMethod}</td>
+                    <td className="hidden px-3 py-4 capitalize md:table-cell">{order.paymentMethod}</td>
                     <td className="px-3 py-4 font-bold">{formatPKR(order.total)}</td>
                     <td className="px-3 py-4 text-right">
                       <OrderStatusSelect orderId={order.id} status={order.status} trackingNumber={order.trackingNumber} />

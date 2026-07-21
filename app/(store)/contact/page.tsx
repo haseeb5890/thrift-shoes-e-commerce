@@ -39,7 +39,7 @@ export default function ContactPage() {
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 md:px-6 md:py-20">
       <p className="text-xs font-bold uppercase tracking-widest text-primary">We're here to help</p>
-      <h1 className="mt-3 text-balance font-serif text-5xl font-black leading-none md:text-6xl">Get in touch.</h1>
+      <h1 className="mt-3 text-balance font-serif text-4xl font-black leading-none md:text-6xl">Get in touch.</h1>
       <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground">
         Questions about an order, a specific pair, or sizing? Reach us however's easiest — we usually reply within a
         few hours.

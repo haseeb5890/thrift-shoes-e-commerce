@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Logo } from "@/components/logo"
 
 const WHATSAPP_NUMBER = "923413907007"
-const INSTAGRAM_URL = "https://instagram.com/primesoles.pk"
+const INSTAGRAM_URL = "https://www.instagram.com/prime_solespk"
 const FACEBOOK_URL = "https://facebook.com/primesoles.pk"
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi! I'd like some help finding the right pair on Prime Soles.")}`
 
@@ -43,5 +43,5 @@ export function SiteFooter() {
     <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="Chat with Prime Soles on WhatsApp" className="flex size-9 items-center justify-center text-background/80 transition-colors hover:text-[#25D366]">
       <WhatsAppGlyph className="size-4.5" />
     </a>
-  </div></div><div><h2 className="text-sm font-bold uppercase tracking-widest">Shop</h2><div className="mt-4 flex flex-col gap-3 text-sm text-background/70"><Link href="/shop">All shoes</Link><Link href="/condition-guide">Condition guide</Link><Link href="/about">Our process</Link><Link href="/track">Track order</Link></div></div><div><h2 className="text-sm font-bold uppercase tracking-widest">Help</h2><div className="mt-4 flex flex-col gap-3 text-sm text-background/70"><span>COD nationwide</span><span>WhatsApp support</span><a href="tel:+923413907007" className="hover:text-background transition-colors">+92 341 3907007</a><a href="mailto:support@primesoles.pk" className="hover:text-background transition-colors break-all">support@primesoles.pk</a></div></div></div><div className="border-t border-background/15 px-4 py-5 text-center text-xs text-background/60">© 2026 Prime Soles. Built for better rotation.</div></footer>
+  </div></div><div><h2 className="text-sm font-bold uppercase tracking-widest">Shop</h2><div className="mt-4 flex flex-col gap-3 text-sm text-background/70"><Link href="/shop">All shoes</Link><Link href="/condition-guide">Condition guide</Link><Link href="/about">Our process</Link><Link href="/track">Track order</Link><Link href="/return-policy">Return policy</Link></div></div><div><h2 className="text-sm font-bold uppercase tracking-widest">Help</h2><div className="mt-4 flex flex-col gap-3 text-sm text-background/70"><span>COD nationwide</span><span>WhatsApp support</span><a href="tel:+923413907007" className="hover:text-background transition-colors">+92 341 3907007</a><a href="mailto:support@primesoles.pk" className="hover:text-background transition-colors break-all">support@primesoles.pk</a></div></div></div><div className="border-t border-background/15 px-4 py-5 text-center text-xs text-background/60">© 2026 Prime Soles. Built for better rotation.</div></footer>
 }
