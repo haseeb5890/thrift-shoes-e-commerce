@@ -7,6 +7,7 @@ import { eq, and, asc, inArray } from "drizzle-orm"
 import { requireAdminAction } from "@/lib/auth-helpers"
 import { db } from "@/lib/db"
 import { products, productMedia } from "@/lib/db/schema"
+import { deleteMediaByUrls } from "@/lib/r2"
 
 const productSchema = z.object({
   name: z.string().min(2),
@@ -91,13 +92,21 @@ export async function updateProduct(formData: FormData) {
   const productId = String(formData.get("id"))
   if (!productId) throw new Error("Missing product id")
 
+  const [existingProduct] = await db.select({ stock: products.stock, soldAt: products.soldAt }).from(products).where(eq(products.id, productId))
+  if (!existingProduct) throw new Error("Product not found")
+
   const data = parseProductFields(formData)
   const newImageUrls = mediaUrls(formData, "imageUrls")
   const newVideoUrl = mediaUrls(formData, "videoUrl")[0] ?? null
   const removeIds = formData.getAll("removeMediaIds").map(String).filter(Boolean)
 
   if (removeIds.length) {
+    const removedRows = await db
+      .select({ url: productMedia.url })
+      .from(productMedia)
+      .where(and(eq(productMedia.productId, productId), inArray(productMedia.id, removeIds)))
     await db.delete(productMedia).where(and(eq(productMedia.productId, productId), inArray(productMedia.id, removeIds)))
+    await deleteMediaByUrls(removedRows.map((row) => row.url))
   }
 
   const existingImages = await db.select().from(productMedia).where(and(eq(productMedia.productId, productId), eq(productMedia.kind, "image"))).orderBy(asc(productMedia.sortOrder))
@@ -110,6 +119,12 @@ export async function updateProduct(formData: FormData) {
   if (existingImages.length === 0 && newImageUrls.length === 0) throw new Error("A product must keep at least one image")
 
   const cover = existingImages[0] ?? (newImageUrls[0] ? { url: newImageUrls[0] } : null)
+
+  // Track when the product actually became/stopped being sold out, independent of how stock
+  // got there (checkout or a manual edit) — the sold-product storage cleanup cron measures its
+  // grace period from this.
+  const newlySoldOut = existingProduct.stock > 0 && data.stock <= 0
+  const restocked = existingProduct.stock <= 0 && data.stock > 0
 
   await db.update(products).set({
     name: data.name,
@@ -124,6 +139,7 @@ export async function updateProduct(formData: FormData) {
     color: data.color,
     isFeatured: data.isFeatured ?? false,
     stock: data.stock,
+    soldAt: newlySoldOut ? new Date() : restocked ? null : existingProduct.soldAt,
     updatedAt: new Date(),
     ...(cover ? { imageUrl: cover.url, imageAlt: data.name } : {}),
   }).where(eq(products.id, productId))

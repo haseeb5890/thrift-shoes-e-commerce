@@ -2,18 +2,27 @@
 
 import { useState } from "react"
 import { X } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import imageCompression from "browser-image-compression"
+import { getMediaUploadUrl } from "@/app/actions/media"
 
-const PRODUCT_MEDIA_BUCKET = "product-images"
+async function compressImage(file: File): Promise<File> {
+  try {
+    return await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true })
+  } catch {
+    return file // compression is best-effort — fall back to the original rather than block the upload
+  }
+}
 
-async function uploadToStorage(file: File) {
-  const supabase = createClient()
-  const extension = file.name.split(".").pop()
-  const path = `${crypto.randomUUID()}.${extension}`
-  const { error } = await supabase.storage.from(PRODUCT_MEDIA_BUCKET).upload(path, file, { contentType: file.type, upsert: false })
-  if (error) throw new Error(error.message)
-  const { data } = supabase.storage.from(PRODUCT_MEDIA_BUCKET).getPublicUrl(path)
-  return data.publicUrl
+/** Uploads straight from the browser to R2 via a presigned URL — the file never touches our
+ * server, so there's no serverless body-size limit to worry about even for video. */
+async function uploadToR2(file: File, kind: "image" | "video"): Promise<string> {
+  const result = await getMediaUploadUrl({ fileName: file.name, contentType: file.type, size: file.size, kind })
+  if ("error" in result) throw new Error(result.error)
+
+  const response = await fetch(result.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } })
+  if (!response.ok) throw new Error("Upload failed — please try again.")
+
+  return result.publicUrl
 }
 
 type MediaEntry = { previewUrl: string; publicUrl: string | null; error: string | null }
@@ -36,7 +45,8 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
     const results = await Promise.all(
       files.map(async (file, index) => {
         try {
-          return { ...next[index], publicUrl: await uploadToStorage(file) }
+          const compressed = await compressImage(file)
+          return { ...next[index], publicUrl: await uploadToR2(compressed, "image") }
         } catch (err) {
           return { ...next[index], error: err instanceof Error ? err.message : "Upload failed" }
         }
@@ -56,11 +66,12 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
   async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (video) URL.revokeObjectURL(video.previewUrl)
     const file = e.target.files?.[0]
+    e.target.value = ""
     if (!file) { setVideo(null); return }
     const entry: MediaEntry = { previewUrl: URL.createObjectURL(file), publicUrl: null, error: null }
     setVideo(entry)
     try {
-      setVideo({ ...entry, publicUrl: await uploadToStorage(file) })
+      setVideo({ ...entry, publicUrl: await uploadToR2(file, "video") })
     } catch (err) {
       setVideo({ ...entry, error: err instanceof Error ? err.message : "Upload failed" })
     }
@@ -99,7 +110,8 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
         {imagesRequired && images.length === 0 && <p className="mt-1 text-xs text-muted-foreground">At least one photo is required.</p>}
       </div>
       <div>
-        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product video (optional)</label>
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product video (optional, max 30s / 5MB)</label>
+        <p className="mt-1 text-xs text-muted-foreground">Compress it first with the local video-compressor tool (in the <code>video-compressor</code> project alongside this one).</p>
         <input type="file" accept="video/*" onChange={onVideoChange} className="mt-2 block w-full text-sm" />
         {video && (
           <div className="relative mt-3 max-w-xs">
