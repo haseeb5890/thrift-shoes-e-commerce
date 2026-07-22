@@ -48,9 +48,11 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
       })
 
       for (const item of data.items) {
+        // Stamps soldAt the instant stock actually hits 0 — this is what the sold-product
+        // storage-cleanup cron (app/api/cron/cleanup-sold-products) measures its grace period from.
         const [claimed] = await tx
           .update(products)
-          .set({ stock: sql`${products.stock} - 1` })
+          .set({ stock: sql`${products.stock} - 1`, soldAt: sql`case when ${products.stock} - 1 <= 0 then now() else ${products.soldAt} end` })
           .where(and(eq(products.id, item.id), gt(products.stock, 0)))
           .returning({ id: products.id })
         if (!claimed) throw new Error(`SOLD_OUT:${item.name} (${item.size})`)
