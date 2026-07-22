@@ -79,8 +79,8 @@ function applyFiltersInMemory(items: Product[], filters: ProductFilters): Produc
   const indexed = items.map((item, index) => ({ item, index }))
 
   const filtered = indexed.filter(({ item }) => {
-    if (filters.category && item.category !== filters.category) return false
-    if (filters.gender && item.gender !== filters.gender) return false
+    if (filters.category && !item.category.includes(filters.category)) return false
+    if (filters.gender && item.gender !== filters.gender && !(item.gender === "Unisex" && (filters.gender === "Men" || filters.gender === "Women"))) return false
     if (sizes.length && !sizes.includes(item.size)) return false
     if (brands.length && !brands.includes(item.brand)) return false
     if (conditions.length && !conditions.includes(item.condition)) return false
@@ -120,8 +120,14 @@ export async function getProducts(filters: ProductFilters = {}): Promise<Product
   try {
     const conditionsList: SQL[] = [eq(products.isActive, true)]
 
-    if (filters.category) conditionsList.push(eq(products.category, filters.category))
-    if (filters.gender) conditionsList.push(eq(products.gender, filters.gender))
+    if (filters.category) conditionsList.push(sql`${filters.category} = any(${products.category})`)
+    if (filters.gender) {
+      conditionsList.push(
+        filters.gender === "Men" || filters.gender === "Women"
+          ? or(eq(products.gender, filters.gender), eq(products.gender, "Unisex"))!
+          : eq(products.gender, filters.gender),
+      )
+    }
     if (sizes.length) conditionsList.push(inArray(products.size, sizes))
     if (brands.length) conditionsList.push(inArray(products.brand, brands))
     if (conditions.length) conditionsList.push(inArray(products.condition, conditions))
@@ -215,8 +221,14 @@ export async function getFacetedFilterCounts(filters: ProductFilters = {}): Prom
       if (exclude !== "size" && sizes.length) list.push(inArray(products.size, sizes))
       if (exclude !== "brand" && brands.length) list.push(inArray(products.brand, brands))
       if (exclude !== "condition" && conditions.length) list.push(inArray(products.condition, conditions))
-      if (exclude !== "gender" && filters.gender) list.push(eq(products.gender, filters.gender))
-      if (filters.category) list.push(eq(products.category, filters.category))
+      if (exclude !== "gender" && filters.gender) {
+        list.push(
+          filters.gender === "Men" || filters.gender === "Women"
+            ? or(eq(products.gender, filters.gender), eq(products.gender, "Unisex"))!
+            : eq(products.gender, filters.gender),
+        )
+      }
+      if (filters.category) list.push(sql`${filters.category} = any(${products.category})`)
       if (filters.minPrice) list.push(gte(products.price, Number(filters.minPrice)))
       if (filters.maxPrice) list.push(lte(products.price, Number(filters.maxPrice)))
       return and(...list)!
@@ -240,11 +252,21 @@ export async function getFacetedFilterCounts(filters: ProductFilters = {}): Prom
       return universe.map((u) => ({ value: u.value, count: map.get(u.value) ?? 0 })).sort((a, b) => a.value.localeCompare(b.value))
     }
 
+    // Unisex products count toward both Men and Women, matching how selecting either filter
+    // actually broadens to include Unisex results.
+    function mergeGenders(universe: { value: string }[], counts: { value: string; count: number }[]) {
+      const map = new Map(counts.map((c) => [c.value, c.count]))
+      const unisexCount = map.get("Unisex") ?? 0
+      return universe
+        .map((u) => ({ value: u.value, count: (map.get(u.value) ?? 0) + (u.value === "Men" || u.value === "Women" ? unisexCount : 0) }))
+        .sort((a, b) => a.value.localeCompare(b.value))
+    }
+
     return {
       sizes: merge(sizeUniverse, sizeCounts),
       brands: merge(brandUniverse, brandCounts),
       conditions: merge(conditionUniverse, conditionCounts),
-      genders: merge(genderUniverse, genderCounts),
+      genders: mergeGenders(genderUniverse, genderCounts),
       priceBounds: { min: priceRow[0]?.min ?? 0, max: priceRow[0]?.max ?? 0 },
     }
   } catch {

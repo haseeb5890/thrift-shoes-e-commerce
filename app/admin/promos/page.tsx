@@ -9,17 +9,17 @@ export default async function AdminPromosPage() {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 md:px-6">
-      <h1 className="font-serif text-5xl font-black">Promo codes.</h1>
+      <h1 className="font-serif text-3xl font-black md:text-5xl">Promo codes.</h1>
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
         <div className="order-2 lg:order-1">
           <div className="overflow-x-auto bg-background p-5">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="w-full min-w-70 text-left text-sm md:min-w-140">
               <thead className="border-b border-border text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3">Code</th>
-                  <th className="px-3 py-3">Discount</th>
-                  <th className="px-3 py-3">Redeemed</th>
+                  <th className="hidden px-3 py-3 md:table-cell">Discount</th>
+                  <th className="hidden px-3 py-3 md:table-cell">Redeemed</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3 text-right">Actions</th>
                 </tr>
@@ -31,8 +31,8 @@ export default async function AdminPromosPage() {
                   promoRows.map((promo) => (
                     <tr key={promo.id} className="border-b border-border">
                       <td className="px-3 py-4 font-bold tracking-wider">{promo.code}</td>
-                      <td className="px-3 py-4">{promo.discountPercent}%</td>
-                      <td className="px-3 py-4">{promo.usedCount} / {promo.maxUses}</td>
+                      <td className="hidden px-3 py-4 md:table-cell">{promo.discountPercent}%</td>
+                      <td className="hidden px-3 py-4 md:table-cell">{promo.usedCount} / {promo.maxUses}</td>
                       <td className="px-3 py-4">
                         <span className={`text-xs font-bold uppercase ${promo.isActive && promo.usedCount < promo.maxUses ? "text-accent" : "text-destructive"}`}>
                           {promo.usedCount >= promo.maxUses ? "Exhausted" : promo.isActive ? "Active" : "Disabled"}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 const PRODUCT_MEDIA_BUCKET = "product-images"
@@ -22,10 +23,16 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
   const [video, setVideo] = useState<MediaEntry | null>(null)
 
   async function onImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    images.forEach((img) => URL.revokeObjectURL(img.previewUrl))
     const files = Array.from(e.target.files ?? [])
+    // Reset the input so choosing the same file again (e.g. after removing it) still fires onChange.
+    e.target.value = ""
+    if (files.length === 0) return
+
     const next = files.map((file) => ({ previewUrl: URL.createObjectURL(file), publicUrl: null as string | null, error: null as string | null }))
-    setImages(next)
+    // Append to whatever's already staged — picking photos one at a time should build up the
+    // list, not replace the ones already selected but not yet confirmed.
+    setImages((prev) => [...prev, ...next])
+
     const results = await Promise.all(
       files.map(async (file, index) => {
         try {
@@ -35,7 +42,15 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
         }
       }),
     )
-    setImages(results)
+    setImages((prev) => prev.map((img) => results.find((r) => r.previewUrl === img.previewUrl) ?? img))
+  }
+
+  function removeImage(previewUrl: string) {
+    setImages((prev) => {
+      const target = prev.find((img) => img.previewUrl === previewUrl)
+      if (target) URL.revokeObjectURL(target.previewUrl)
+      return prev.filter((img) => img.previewUrl !== previewUrl)
+    })
   }
 
   async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -69,6 +84,14 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
                 {!img.publicUrl && !img.error && <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-[10px] font-bold uppercase">Uploading...</div>}
                 {img.error && <div className="absolute inset-0 flex items-center justify-center bg-destructive/80 p-1 text-center text-[9px] font-bold text-destructive-foreground">{img.error}</div>}
                 {img.publicUrl && <input type="hidden" name="imageUrls" value={img.publicUrl} />}
+                <button
+                  type="button"
+                  onClick={() => removeImage(img.previewUrl)}
+                  aria-label={`Remove preview ${index + 1}`}
+                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-foreground/80 text-background"
+                >
+                  <X size={12} />
+                </button>
               </div>
             ))}
           </div>

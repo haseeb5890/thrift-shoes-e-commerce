@@ -26,7 +26,7 @@ export default function ReturnPolicyPage() {
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 md:px-6 md:py-20">
       <p className="text-xs font-bold uppercase tracking-widest text-primary">Buyer protection</p>
-      <h1 className="mt-3 text-balance font-serif text-5xl font-black leading-none md:text-6xl">Return policy.</h1>
+      <h1 className="mt-3 text-balance font-serif text-4xl font-black leading-none md:text-6xl">Return policy.</h1>
       <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground">
         We are committed to ensuring your satisfaction with our shoes. If you need to return an item, please review
         our return policy below.

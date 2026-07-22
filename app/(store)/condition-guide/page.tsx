@@ -9,7 +9,7 @@ export default function ConditionGuidePage() {
   return (
     <section className="mx-auto max-w-5xl px-4 py-12 md:px-6 md:py-20">
       <p className="text-xs font-bold uppercase tracking-widest text-primary">How we grade</p>
-      <h1 className="mt-3 text-balance font-serif text-5xl font-black leading-none md:text-6xl">
+      <h1 className="mt-3 text-balance font-serif text-4xl font-black leading-none md:text-6xl">
         One pair, one honest grade.
       </h1>
       <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground">

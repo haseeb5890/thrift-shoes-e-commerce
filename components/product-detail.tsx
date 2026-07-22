@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type TouchEvent } from "react"
 import Image from "next/image"
-import Link from "next/link"
-import { Check, ChevronLeft, Minus, Plus, ShieldCheck, Truck } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Check, ChevronLeft, ChevronRight, Minus, Play, Plus, ShieldCheck, Truck } from "lucide-react"
 import { toast } from "sonner"
 import { useStore } from "@/components/store-provider"
 import { useWhatsAppMessage } from "@/components/whatsapp-provider"
@@ -19,18 +19,21 @@ import { formatPKR, type Product } from "@/lib/store-data"
 type Media = { id: string; url: string; kind: string }
 
 export function ProductDetail({ product, media }: { product: Product; media: Media[] }) {
+  const router = useRouter()
   const { addToCart } = useStore()
   const { setMessage } = useWhatsAppMessage()
   const soldOut = product.stock <= 0
-  const gallery: Media[] = media.length ? media : [{ id: "cover", url: product.imageUrl, kind: "image" }]
+  const rawGallery: Media[] = media.length ? media : [{ id: "cover", url: product.imageUrl, kind: "image" }]
+  // Videos always sort to the end of the strip, after every photo, regardless of upload order.
+  const gallery: Media[] = [...rawGallery].sort((a, b) => (a.kind === "video" ? 1 : 0) - (b.kind === "video" ? 1 : 0))
   const [activeId, setActiveId] = useState(gallery[0].id)
   const active = gallery.find((item) => item.id === activeId) ?? gallery[0]
+  const galleryIndex = gallery.findIndex((item) => item.id === active.id)
   const [related, setRelated] = useState<Product[]>([])
   const touchStartX = useRef<number | null>(null)
 
   function goToOffset(offset: number) {
-    const index = gallery.findIndex((item) => item.id === active.id)
-    const next = gallery[index + offset]
+    const next = gallery[galleryIndex + offset]
     if (next) setActiveId(next.id)
   }
 
@@ -80,20 +83,48 @@ export function ProductDetail({ product, media }: { product: Product; media: Med
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-14">
-      <Link href="/shop" className="mb-6 flex items-center gap-2 text-sm font-bold">
+      <button type="button" onClick={() => router.back()} className="mb-6 flex items-center gap-2 text-sm font-bold">
         <ChevronLeft size={16} /> Back to shop
-      </Link>
+      </button>
       <div className="grid gap-8 md:grid-cols-2 md:gap-14">
         <div>
           <div
-            className="relative aspect-square touch-pan-y select-none bg-secondary"
+            className="relative aspect-square touch-pan-y select-none overflow-hidden bg-secondary"
             onTouchStart={onGalleryTouchStart}
             onTouchEnd={onGalleryTouchEnd}
           >
-            {active.kind === "video" ? (
-              <video src={active.url} controls className="size-full object-cover" />
-            ) : (
-              <Image src={active.url} alt={product.imageAlt} fill priority className="pointer-events-none object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+            <div key={active.id} className="absolute inset-0 animate-in fade-in slide-in-from-right-4 duration-300">
+              {active.kind === "video" ? (
+                <video src={active.url} controls className="size-full object-cover" />
+              ) : (
+                <Image src={active.url} alt={product.imageAlt} fill priority className="pointer-events-none object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+              )}
+            </div>
+
+            {gallery.length > 1 && (
+              <>
+                <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-foreground/70 px-2.5 py-1 text-xs font-bold text-background">
+                  {galleryIndex + 1} / {gallery.length}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goToOffset(-1)}
+                  disabled={galleryIndex === 0}
+                  aria-label="Previous photo"
+                  className="absolute left-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-background/80 p-2 shadow-md transition hover:bg-background disabled:pointer-events-none disabled:opacity-0 md:flex"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToOffset(1)}
+                  disabled={galleryIndex === gallery.length - 1}
+                  aria-label="Next photo"
+                  className="absolute right-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-background/80 p-2 shadow-md transition hover:bg-background disabled:pointer-events-none disabled:opacity-0 md:flex"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </>
             )}
           </div>
           {gallery.length > 1 && (
@@ -102,11 +133,16 @@ export function ProductDetail({ product, media }: { product: Product; media: Med
                 <button
                   key={item.id}
                   onClick={() => setActiveId(item.id)}
-                  className={`relative size-16 shrink-0 overflow-hidden border-2 bg-secondary ${active.id === item.id ? "border-primary" : "border-transparent"}`}
-                  aria-label="Show media"
+                  className={`relative size-16 shrink-0 overflow-hidden border-2 bg-secondary transition-opacity hover:opacity-90 md:size-20 ${active.id === item.id ? "border-primary" : "border-transparent"}`}
+                  aria-label={item.kind === "video" ? "Play video" : "Show photo"}
                 >
                   {item.kind === "video" ? (
-                    <video src={item.url} className="size-full object-cover" />
+                    <>
+                      <video src={item.url} preload="metadata" muted playsInline className="size-full object-cover" />
+                      <span className="absolute inset-0 flex items-center justify-center bg-foreground/30">
+                        <Play size={18} className="fill-background text-background" />
+                      </span>
+                    </>
                   ) : (
                     <Image src={item.url} alt="" fill className="object-cover" />
                   )}

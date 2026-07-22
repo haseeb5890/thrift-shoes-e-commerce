@@ -6,8 +6,8 @@ export default async function AdminUsersPage() {
   const users = await listUsers()
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 md:px-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-serif text-5xl font-black">Users.</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-serif text-3xl font-black md:text-5xl">Users.</h1>
         <ExportCsvButton target={{ type: "users" }} filename={`users-${new Date().toISOString().slice(0, 10)}.csv`} />
       </div>
       <div className="mt-8 overflow-x-auto bg-background p-5">

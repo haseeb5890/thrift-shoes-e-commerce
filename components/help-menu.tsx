@@ -8,6 +8,7 @@ const HELP_LINKS = [
   { label: "Condition guide", href: "/condition-guide" },
   { label: "Size guide", href: "/size-guide" },
   { label: "Track order", href: "/track" },
+  { label: "Return policy", href: "/return-policy" },
   { label: "Contact", href: "/contact" },
 ]
 

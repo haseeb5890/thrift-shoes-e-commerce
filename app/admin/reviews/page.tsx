@@ -4,27 +4,36 @@ import { useEffect, useState, useTransition } from "react"
 import Image from "next/image"
 import { Star } from "lucide-react"
 import { toast } from "sonner"
-import { listAllReviews, moderateReview, deleteReview, addAdminReview } from "@/app/actions/reviews"
+import { listPendingReviews, listReviewHistory, moderateReview, deleteReview, addAdminReview } from "@/app/actions/reviews"
 
-type Review = Awaited<ReturnType<typeof listAllReviews>>[number]
+type Review = Awaited<ReturnType<typeof listPendingReviews>>[number]
 
 const field = "h-11 border border-border bg-card px-3 text-sm outline-none focus:border-primary"
 
 export default function AdminReviewsPage() {
-  const [reviewRows, setReviewRows] = useState<Review[]>([])
+  const [pending, setPending] = useState<Review[]>([])
+  const [history, setHistory] = useState<Review[]>([])
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyTotalPages, setHistoryTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
   const [rating, setRating] = useState(5)
 
   useEffect(() => {
-    listAllReviews().then((rows) => {
-      setReviewRows(rows)
+    Promise.all([listPendingReviews(), listReviewHistory(historyPage)]).then(([pendingRows, historyResult]) => {
+      setPending(pendingRows)
+      setHistory(historyResult.reviews)
+      setHistoryTotalPages(historyResult.totalPages)
       setLoading(false)
     })
-  }, [])
+  }, [historyPage])
 
   function refresh() {
-    listAllReviews().then(setReviewRows)
+    listPendingReviews().then(setPending)
+    listReviewHistory(historyPage).then((result) => {
+      setHistory(result.reviews)
+      setHistoryTotalPages(result.totalPages)
+    })
   }
 
   function handleModerate(id: string, status: "approved" | "rejected") {
@@ -64,12 +73,9 @@ export default function AdminReviewsPage() {
     })
   }
 
-  const pending = reviewRows.filter((r) => r.status === "pending")
-  const others = reviewRows.filter((r) => r.status !== "pending")
-
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 md:px-6">
-      <h1 className="font-serif text-5xl font-black">Reviews.</h1>
+      <h1 className="font-serif text-3xl font-black md:text-5xl">Reviews.</h1>
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
         <div>
@@ -114,22 +120,22 @@ export default function AdminReviewsPage() {
 
           <h2 className="mt-10 font-serif text-2xl font-black">All reviews</h2>
           <div className="mt-4 overflow-x-auto bg-background p-4">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="w-full min-w-60 text-left text-sm md:min-w-140">
               <thead className="border-b border-border text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="py-2">Customer</th>
-                  <th>Rating</th>
-                  <th>Source</th>
+                  <th className="hidden md:table-cell">Rating</th>
+                  <th className="hidden md:table-cell">Source</th>
                   <th>Status</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {others.map((review) => (
+                {history.map((review) => (
                   <tr key={review.id} className="border-b border-border">
                     <td className="py-3 font-bold">{review.customerName}</td>
-                    <td>{review.rating}â˜…</td>
-                    <td className="capitalize">{review.source}</td>
+                    <td className="hidden md:table-cell">{review.rating}★</td>
+                    <td className="hidden capitalize md:table-cell">{review.source}</td>
                     <td className="capitalize">{review.status}</td>
                     <td className="text-right">
                       <button disabled={isPending} onClick={() => handleDelete(review.id)} className="text-xs font-bold uppercase tracking-wider text-destructive underline disabled:opacity-50">
@@ -141,6 +147,37 @@ export default function AdminReviewsPage() {
               </tbody>
             </table>
           </div>
+
+          {historyTotalPages > 1 && (
+            <nav className="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
+              <button
+                type="button"
+                onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                disabled={historyPage <= 1}
+                className="flex h-9 min-w-9 items-center justify-center border border-border px-3 text-xs font-bold uppercase tracking-wider hover:border-foreground disabled:pointer-events-none disabled:opacity-40"
+              >
+                Prev
+              </button>
+              {Array.from({ length: historyTotalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => setHistoryPage(p)}
+                  className={`flex h-9 min-w-9 items-center justify-center border px-3 text-xs font-bold ${p === historyPage ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground"}`}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
+                disabled={historyPage >= historyTotalPages}
+                className="flex h-9 min-w-9 items-center justify-center border border-border px-3 text-xs font-bold uppercase tracking-wider hover:border-foreground disabled:pointer-events-none disabled:opacity-40"
+              >
+                Next
+              </button>
+            </nav>
+          )}
         </div>
 
         <div className="h-fit border border-border bg-background p-5">

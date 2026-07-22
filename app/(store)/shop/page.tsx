@@ -13,11 +13,11 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   const view = filters.view === "list" ? "list" : "grid"
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
+    <section className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-2 px-4 pb-12 pt-10 duration-500 md:px-6 md:py-16">
       <div className="flex flex-col justify-between gap-6 border-b border-border pb-8 md:flex-row md:items-end">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">One-of-one pairs</p>
-          <h1 className="mt-2 font-serif text-5xl font-black">
+          <h1 className="mt-2 font-serif text-3xl font-black md:text-5xl">
             {filters.q ? `Results for "${filters.q}"` : filters.category ?? "Shop all shoes"}
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">

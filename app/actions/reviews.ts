@@ -2,7 +2,7 @@
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
-import { desc, eq } from "drizzle-orm"
+import { desc, eq, ne, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { reviews } from "@/lib/db/schema"
@@ -88,10 +88,23 @@ export async function getApprovedReviews(limit = 12) {
   return db.select().from(reviews).where(eq(reviews.status, "approved")).orderBy(desc(reviews.createdAt)).limit(limit)
 }
 
-/** Admin: every review regardless of status, for the moderation queue. */
-export async function listAllReviews() {
+const REVIEW_HISTORY_PAGE_SIZE = 20
+
+/** Admin: the actionable moderation queue — small by nature, so left unpaginated. */
+export async function listPendingReviews() {
   await requireAdminAction()
-  return db.select().from(reviews).orderBy(desc(reviews.createdAt))
+  return db.select().from(reviews).where(eq(reviews.status, "pending")).orderBy(desc(reviews.createdAt))
+}
+
+/** Admin: past (non-pending) reviews — paginated since this grows without bound over time. */
+export async function listReviewHistory(page = 1) {
+  await requireAdminAction()
+  const where = ne(reviews.status, "pending")
+  const [rows, [{ count }]] = await Promise.all([
+    db.select().from(reviews).where(where).orderBy(desc(reviews.createdAt)).limit(REVIEW_HISTORY_PAGE_SIZE).offset((page - 1) * REVIEW_HISTORY_PAGE_SIZE),
+    db.select({ count: sql<number>`count(*)::int` }).from(reviews).where(where),
+  ])
+  return { reviews: rows, total: count, totalPages: Math.max(1, Math.ceil(count / REVIEW_HISTORY_PAGE_SIZE)) }
 }
 
 export async function moderateReview(reviewId: string, status: "approved" | "rejected"): Promise<{ error: string } | { success: true }> {

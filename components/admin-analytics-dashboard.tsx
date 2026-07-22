@@ -137,7 +137,7 @@ export function AdminAnalyticsDashboard({ initialData }: { initialData: OrderAna
       <div className="mt-8">
         <h2 className="font-serif text-2xl font-black">Orders by status</h2>
         <p className="mt-1 text-xs text-muted-foreground">For the selected period, regardless of the status filter above.</p>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
           {BREAKDOWN_CARDS.map((card) => (
             <div key={card.key} className="bg-background p-4">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{card.label}</p>

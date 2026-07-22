@@ -1,6 +1,6 @@
 export default function ShopLoading() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
+    <section className="mx-auto max-w-7xl px-4 pb-12 pt-10 md:px-6 md:py-16">
       <div className="flex flex-col justify-between gap-6 border-b border-border pb-8 md:flex-row md:items-end">
         <div>
           <div className="h-3 w-32 animate-pulse bg-secondary" />

@@ -18,9 +18,9 @@ export default async function TrackPage() {
   const myOrders = await getOrdersForProfile(profile.id)
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-20 md:px-6">
+    <section className="mx-auto max-w-3xl animate-in fade-in slide-in-from-bottom-2 px-4 pb-20 pt-10 duration-500 md:px-6">
       <p className="text-xs font-bold uppercase tracking-widest text-primary">Signed in as {profile.email}</p>
-      <h1 className="mt-3 font-serif text-5xl font-black">Your orders</h1>
+      <h1 className="mt-3 font-serif text-3xl font-black md:text-5xl">Your orders</h1>
 
       {myOrders.length === 0 ? (
         <p className="mt-6 text-sm leading-6 text-muted-foreground">
@@ -29,9 +29,11 @@ export default async function TrackPage() {
       ) : (
         <div className="mt-8 flex flex-col gap-6">
           {myOrders.map((order) => (
-            <div key={order.id} className="bg-secondary p-6">
+            <div key={order.id} className="relative bg-secondary p-6 transition-colors hover:bg-secondary/70">
+              <Link href={`/track/${order.id}`} className="absolute inset-0" aria-label={`View order ${order.orderNumber}`} />
+
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <Link href={`/track/${order.id}`} className="text-xs font-bold uppercase tracking-widest text-primary underline">{order.orderNumber}</Link>
+                <p className="text-xs font-bold uppercase tracking-widest text-primary">{order.orderNumber}</p>
                 <p className="text-sm font-bold">{formatPKR(order.total)}</p>
               </div>
 
@@ -62,7 +64,7 @@ export default async function TrackPage() {
                         target="_blank"
                         rel="noreferrer"
                         aria-label="Track shipment on courier site"
-                        className="text-primary"
+                        className="relative z-10 text-primary"
                       >
                         <ExternalLink size={13} />
                       </a>
@@ -76,7 +78,7 @@ export default async function TrackPage() {
               </div>
 
               {order.status === "placed" && Date.now() - new Date(order.createdAt).getTime() <= CANCELLABLE_WINDOW_MS && (
-                <div className="mt-5 border-t border-border pt-4">
+                <div className="relative z-10 mt-5 border-t border-border pt-4">
                   <CancelOrderButton orderId={order.id} />
                 </div>
               )}

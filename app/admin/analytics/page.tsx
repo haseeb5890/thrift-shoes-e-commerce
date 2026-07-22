@@ -7,7 +7,7 @@ export default async function AdminAnalyticsPage() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
       <p className="text-xs font-bold uppercase tracking-widest text-primary">Sales performance</p>
-      <h1 className="mt-2 font-serif text-5xl font-black">Revenue & orders.</h1>
+      <h1 className="mt-2 font-serif text-3xl font-black md:text-5xl">Revenue & orders.</h1>
       <div className="mt-8">
         <AdminAnalyticsDashboard initialData={initialData} />
       </div>
