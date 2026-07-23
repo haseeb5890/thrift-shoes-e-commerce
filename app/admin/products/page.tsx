@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { products } from "@/lib/db/schema"
 import { ExportCsvButton } from "@/components/export-csv-button"
 import { InlinePriceEditor } from "@/components/inline-price-editor"
+import { DeleteProductButton } from "@/components/delete-product-button"
 
 const PAGE_SIZE = 20
 
@@ -37,7 +38,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
               <th className="px-3 py-3">Price</th>
               <th className="hidden px-3 py-3 md:table-cell">Stock</th>
               <th className="px-3 py-3">Status</th>
-              <th className="px-3 py-3 text-right">Edit</th>
+              <th className="px-3 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -56,7 +57,10 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
                     <span className={`text-xs font-bold uppercase ${product.stock ? "text-accent" : "text-destructive"}`}>{product.stock ? "Live" : "Sold"}</span>
                   </td>
                   <td className="px-3 py-4 text-right">
-                    <Link href={`/admin/products/${product.id}/edit`} className="text-xs font-bold uppercase tracking-widest underline">Edit</Link>
+                    <div className="flex items-center justify-end gap-4">
+                      <Link href={`/admin/products/${product.id}/edit`} className="text-xs font-bold uppercase tracking-widest underline">Edit</Link>
+                      <DeleteProductButton productId={product.id} productName={product.name} />
+                    </div>
                   </td>
                 </tr>
               ))

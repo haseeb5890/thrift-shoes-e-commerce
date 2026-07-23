@@ -6,7 +6,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { eq, and, asc, inArray } from "drizzle-orm"
 import { requireAdminAction } from "@/lib/auth-helpers"
 import { db } from "@/lib/db"
-import { products, productMedia } from "@/lib/db/schema"
+import { products, productMedia, wishlists, reviews } from "@/lib/db/schema"
 import { deleteMediaByUrls } from "@/lib/r2"
 
 const productSchema = z.object({
@@ -149,6 +149,35 @@ export async function updateProduct(formData: FormData) {
   revalidatePath("/shop")
   revalidateTag("product-facet-universe", "max")
   redirect("/admin/products")
+}
+
+/**
+ * Manual admin delete — mirrors the sold-out cleanup cron's cleanup order (storage first, then
+ * DB rows) but runs immediately instead of after a grace period, since an admin deleting a
+ * listing directly is an explicit, deliberate action. order_items keeps its own denormalized
+ * copy of name/size/image so past orders are unaffected. Wishlist entries pointing at this
+ * product are removed (they'd just be dangling); reviews are kept but unlinked, since a review's
+ * text/photo is worth keeping even after the specific pair it was about is gone.
+ */
+export async function deleteProduct(productId: string): Promise<{ error: string } | { success: true }> {
+  await requireAdminAction()
+
+  const [product] = await db.select({ imageUrl: products.imageUrl }).from(products).where(eq(products.id, productId))
+  if (!product) return { error: "Product not found" }
+
+  const media = await db.select({ url: productMedia.url }).from(productMedia).where(eq(productMedia.productId, productId))
+  await deleteMediaByUrls([product.imageUrl, ...media.map((row) => row.url)])
+
+  await db.delete(productMedia).where(eq(productMedia.productId, productId))
+  await db.delete(wishlists).where(eq(wishlists.productId, productId))
+  await db.update(reviews).set({ productId: null }).where(eq(reviews.productId, productId))
+  await db.delete(products).where(eq(products.id, productId))
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/products")
+  revalidatePath("/shop")
+  revalidateTag("product-facet-universe", "max")
+  return { success: true }
 }
 
 export async function updateProductPrice(productId: string, price: number) {
