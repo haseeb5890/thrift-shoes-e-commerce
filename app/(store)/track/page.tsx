@@ -5,7 +5,7 @@ import { getOrdersForProfile } from "@/app/actions/tracking"
 import { TrackForm } from "@/components/track-form"
 import { OrderStatusTimeline } from "@/components/order-status-timeline"
 import { CancelOrderButton } from "@/components/cancel-order-button"
-import { formatPKR, getDeliveryWindow } from "@/lib/store-data"
+import { formatPKR, getDeliveryWindow, getCourierTrackingUrl } from "@/lib/store-data"
 
 const CANCELLABLE_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours — mirrors app/actions/orders.ts
 
@@ -60,7 +60,7 @@ export default async function TrackPage() {
                     <p className="font-bold">{order.trackingNumber ?? "Assigned after dispatch"}</p>
                     {order.trackingNumber && (
                       <a
-                        href={`https://parcelsapp.com/en/tracking/${encodeURIComponent(order.trackingNumber)}`}
+                        href={getCourierTrackingUrl(order.trackingNumber)}
                         target="_blank"
                         rel="noreferrer"
                         aria-label="Track shipment on courier site"
