@@ -4,9 +4,15 @@ import { useEffect, useRef, useState, useTransition } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
 import { ProductCard } from "@/components/product-card"
 import { ProductListRow } from "@/components/product-list-row"
+import { useShopPending } from "@/components/shop-pending-provider"
 import { loadMoreProducts } from "@/app/actions/shop-products"
 import type { Product } from "@/lib/store-data"
 import type { ProductFilters } from "@/lib/products"
+
+// A saved list older than this is treated as stale rather than restored — otherwise a visitor
+// who left a shop tab open and comes back later would see whatever was loaded at the time they
+// left (missing newly-added products at the top) instead of the freshly server-fetched list.
+const SAVED_LIST_TTL_MS = 5 * 60 * 1000
 
 // Split into two keys so the per-scroll-frame write only ever touches a tiny {key, scrollY}
 // payload — re-stringifying the (potentially large, ever-growing) loaded product list on every
@@ -14,7 +20,7 @@ import type { ProductFilters } from "@/lib/products"
 const LIST_STORAGE_KEY = "shop-grid-list-state"
 const SCROLL_STORAGE_KEY = "shop-grid-scroll-y"
 
-type SavedList = { key: string; items: Product[]; page: number; hasMore: boolean }
+type SavedList = { key: string; items: Product[]; page: number; hasMore: boolean; savedAt: number }
 type SavedScroll = { key: string; scrollY: number }
 
 function readSavedList(key: string): SavedList | null {
@@ -23,7 +29,9 @@ function readSavedList(key: string): SavedList | null {
     const raw = sessionStorage.getItem(LIST_STORAGE_KEY)
     if (!raw) return null
     const saved = JSON.parse(raw) as SavedList
-    return saved.key === key ? saved : null
+    if (saved.key !== key) return null
+    if (Date.now() - saved.savedAt > SAVED_LIST_TTL_MS) return null
+    return saved
   } catch {
     return null
   }
@@ -55,6 +63,7 @@ export function ProductGrid({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const key = `${pathname}?${searchParams.toString()}`
+  const { isPending: navPending } = useShopPending()
 
   // Read once, on first render for this key — this is what lets a back-navigation to the exact
   // same filters restore the already-loaded items instead of snapping back to page 1.
@@ -84,7 +93,7 @@ export function ProductGrid({
   // not on every scroll frame.
   useEffect(() => {
     try {
-      sessionStorage.setItem(LIST_STORAGE_KEY, JSON.stringify({ key, items, page, hasMore }))
+      sessionStorage.setItem(LIST_STORAGE_KEY, JSON.stringify({ key, items, page, hasMore, savedAt: Date.now() }))
     } catch {
       // sessionStorage unavailable (private browsing etc.) — silently no-op.
     }
@@ -147,10 +156,12 @@ export function ProductGrid({
 
   return (
     <>
-      <div className={view === "list" ? "flex flex-col gap-6" : "grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 md:gap-6"}>
-        {items.map((product) =>
-          view === "list" ? <ProductListRow key={product.id} product={product} /> : <ProductCard key={product.id} product={product} />,
-        )}
+      <div className={`transition-opacity duration-150 ${navPending ? "pointer-events-none opacity-40" : ""}`}>
+        <div className={view === "list" ? "flex flex-col gap-6" : "grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 md:gap-6"}>
+          {items.map((product) =>
+            view === "list" ? <ProductListRow key={product.id} product={product} /> : <ProductCard key={product.id} product={product} />,
+          )}
+        </div>
       </div>
 
       {hasMore && (

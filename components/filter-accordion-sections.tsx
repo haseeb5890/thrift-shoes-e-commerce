@@ -6,6 +6,7 @@ import * as Slider from "@radix-ui/react-slider"
 import Link from "next/link"
 import { Minus, Plus } from "lucide-react"
 import { useRouter, usePathname, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation"
+import { useShopPending } from "@/components/shop-pending-provider"
 import type { FacetCounts } from "@/lib/products"
 
 const triggerClass = "group flex w-full items-center justify-between text-left text-xs font-bold uppercase tracking-wider"
@@ -22,11 +23,13 @@ function PriceRangeFilter({
   router,
   pathname,
   searchParams,
+  startShopTransition,
 }: {
   bounds: { min: number; max: number }
   router: ReturnType<typeof useRouter>
   pathname: string
   searchParams: ReadonlyURLSearchParams
+  startShopTransition: ReturnType<typeof useShopPending>["startShopTransition"]
 }) {
   const paramMin = searchParams.get("minPrice")
   const paramMax = searchParams.get("maxPrice")
@@ -40,7 +43,7 @@ function PriceRangeFilter({
     if (next[0] > bounds.min) params.set("minPrice", String(next[0])); else params.delete("minPrice")
     if (next[1] < bounds.max) params.set("maxPrice", String(next[1])); else params.delete("maxPrice")
     params.delete("page")
-    router.push(`${pathname}?${params.toString()}`)
+    startShopTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
   if (bounds.min >= bounds.max) return null
@@ -97,6 +100,7 @@ export function FilterAccordionSections({ facets }: { facets: FacetCounts }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { startShopTransition } = useShopPending()
 
   const activeSizes = searchParams.get("size")?.split(",").filter(Boolean) ?? []
   const activeBrands = searchParams.get("brand")?.split(",").filter(Boolean) ?? []
@@ -111,7 +115,7 @@ export function FilterAccordionSections({ facets }: { facets: FacetCounts }) {
     if (next.length) params.set(key, next.join(","))
     else params.delete(key)
     params.delete("page")
-    router.push(`${pathname}?${params.toString()}`)
+    startShopTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
   function toggleGender(value: string) {
@@ -119,7 +123,7 @@ export function FilterAccordionSections({ facets }: { facets: FacetCounts }) {
     if (activeGender === value) params.delete("gender")
     else params.set("gender", value)
     params.delete("page")
-    router.push(`${pathname}?${params.toString()}`)
+    startShopTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
   const availableSizes = facets.sizes.filter((size) => size.count > 0 || activeSizes.includes(size.value))
@@ -242,7 +246,7 @@ export function FilterAccordionSections({ facets }: { facets: FacetCounts }) {
           {indicator}
         </Accordion.Trigger>
         <Accordion.Content className={contentAnimClass}>
-          <PriceRangeFilter bounds={facets.priceBounds} router={router} pathname={pathname} searchParams={searchParams} />
+          <PriceRangeFilter bounds={facets.priceBounds} router={router} pathname={pathname} searchParams={searchParams} startShopTransition={startShopTransition} />
         </Accordion.Content>
       </Accordion.Item>
     </Accordion.Root>
