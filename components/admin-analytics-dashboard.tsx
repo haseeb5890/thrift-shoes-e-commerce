@@ -103,10 +103,10 @@ export function AdminAnalyticsDashboard({ initialData }: { initialData: OrderAna
             </div>
             <button
               onClick={applyCustomRange}
-              disabled={!customFrom || !customTo}
+              disabled={!customFrom || !customTo || isPending}
               className="h-11 bg-primary px-4 text-xs font-bold uppercase tracking-wider text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Apply
+              {isPending ? "Applying..." : "Apply"}
             </button>
           </>
         )}

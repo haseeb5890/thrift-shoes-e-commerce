@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react"
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orderItems, orders } from "@/lib/db/schema"
-import { formatPKR, getDeliveryWindow } from "@/lib/store-data"
+import { formatPKR, getDeliveryWindow, getCourierTrackingUrl } from "@/lib/store-data"
 import { getSessionProfile } from "@/lib/auth-helpers"
 import { OrderStatusTimeline } from "@/components/order-status-timeline"
 import { CancelOrderButton } from "@/components/cancel-order-button"
@@ -58,7 +58,7 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
             <p className="text-sm font-bold">{order.trackingNumber ?? "Assigned after dispatch"}</p>
             {order.trackingNumber && (
               <a
-                href={`https://parcelsapp.com/en/tracking/${encodeURIComponent(order.trackingNumber)}`}
+                href={getCourierTrackingUrl(order.trackingNumber)}
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Track shipment on courier site"

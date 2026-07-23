@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
+import { useFormStatus } from "react-dom"
 import { X } from "lucide-react"
+import { toast } from "sonner"
 import imageCompression from "browser-image-compression"
-import { getMediaUploadUrl } from "@/app/actions/media"
+import { getMediaUploadUrl, deleteStagedMediaUrl } from "@/app/actions/media"
 
 async function compressImage(file: File): Promise<File> {
   try {
@@ -27,9 +29,17 @@ async function uploadToR2(file: File, kind: "image" | "video"): Promise<string> 
 
 type MediaEntry = { previewUrl: string; publicUrl: string | null; error: string | null }
 
+function cleanUpStagedMedia(url: string) {
+  deleteStagedMediaUrl(url).catch(() => toast.error("Couldn't clean up a removed file from storage — it may still be taking up space."))
+}
+
 export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { imagesRequired?: boolean; submitLabel: string }) {
   const [images, setImages] = useState<MediaEntry[]>([])
   const [video, setVideo] = useState<MediaEntry | null>(null)
+  // previewUrls removed while their upload was still in flight — once the upload resolves we
+  // clean up the now-orphaned R2 file instead of adding it to the staged list.
+  const removedWhileUploading = useRef<Set<string>>(new Set())
+  const videoRemovedWhileUploading = useRef(false)
 
   async function onImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -52,29 +62,62 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
         }
       }),
     )
+    for (const result of results) {
+      if (result.publicUrl && removedWhileUploading.current.has(result.previewUrl)) {
+        removedWhileUploading.current.delete(result.previewUrl)
+        cleanUpStagedMedia(result.publicUrl)
+      }
+    }
     setImages((prev) => prev.map((img) => results.find((r) => r.previewUrl === img.previewUrl) ?? img))
   }
 
   function removeImage(previewUrl: string) {
     setImages((prev) => {
       const target = prev.find((img) => img.previewUrl === previewUrl)
-      if (target) URL.revokeObjectURL(target.previewUrl)
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl)
+        if (target.publicUrl) cleanUpStagedMedia(target.publicUrl)
+        else if (!target.error) removedWhileUploading.current.add(previewUrl)
+      }
       return prev.filter((img) => img.previewUrl !== previewUrl)
     })
   }
 
   async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (video) URL.revokeObjectURL(video.previewUrl)
+    if (video) {
+      URL.revokeObjectURL(video.previewUrl)
+      if (video.publicUrl) cleanUpStagedMedia(video.publicUrl)
+      else if (!video.error) videoRemovedWhileUploading.current = true
+    }
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file) { setVideo(null); return }
     const entry: MediaEntry = { previewUrl: URL.createObjectURL(file), publicUrl: null, error: null }
     setVideo(entry)
+    videoRemovedWhileUploading.current = false
     try {
-      setVideo({ ...entry, publicUrl: await uploadToR2(file, "video") })
+      const publicUrl = await uploadToR2(file, "video")
+      if (videoRemovedWhileUploading.current) {
+        videoRemovedWhileUploading.current = false
+        cleanUpStagedMedia(publicUrl)
+        return
+      }
+      setVideo({ ...entry, publicUrl })
     } catch (err) {
-      setVideo({ ...entry, error: err instanceof Error ? err.message : "Upload failed" })
+      if (!videoRemovedWhileUploading.current) setVideo({ ...entry, error: err instanceof Error ? err.message : "Upload failed" })
+      videoRemovedWhileUploading.current = false
     }
+  }
+
+  function removeVideo() {
+    setVideo((current) => {
+      if (current) {
+        URL.revokeObjectURL(current.previewUrl)
+        if (current.publicUrl) cleanUpStagedMedia(current.publicUrl)
+        else if (!current.error) videoRemovedWhileUploading.current = true
+      }
+      return null
+    })
   }
 
   const readyImageCount = images.filter((img) => img.publicUrl).length
@@ -119,13 +162,31 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
             {!video.publicUrl && !video.error && <p className="mt-1 text-xs font-bold uppercase text-muted-foreground">Uploading...</p>}
             {video.error && <p className="mt-1 text-xs font-bold text-destructive">{video.error}</p>}
             {video.publicUrl && <input type="hidden" name="videoUrl" value={video.publicUrl} />}
+            <button
+              type="button"
+              onClick={removeVideo}
+              aria-label="Remove video"
+              className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-foreground/80 text-background"
+            >
+              <X size={12} />
+            </button>
           </div>
         )}
       </div>
       {hasFailedUpload && <p className="text-sm font-bold text-destructive">Some files failed to upload — reselect them before submitting.</p>}
-      <button type="submit" disabled={!canSubmit} className="h-12 bg-primary font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-        {stillUploading ? "Uploading..." : submitLabel}
-      </button>
+      <SubmitButton canSubmit={canSubmit} stillUploading={stillUploading} submitLabel={submitLabel} />
     </div>
+  )
+}
+
+/** Reads the parent form's pending state via useFormStatus, so the button also disables and
+ * shows a loading label while createProduct/updateProduct is actually running server-side —
+ * not just while media is still uploading client-side. */
+function SubmitButton({ canSubmit, stillUploading, submitLabel }: { canSubmit: boolean; stillUploading: boolean; submitLabel: string }) {
+  const { pending } = useFormStatus()
+  return (
+    <button type="submit" disabled={!canSubmit || pending} className="h-12 bg-primary font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+      {stillUploading ? "Uploading..." : pending ? "Saving..." : submitLabel}
+    </button>
   )
 }

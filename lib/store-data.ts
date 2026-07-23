@@ -28,6 +28,9 @@ export const shippingRates: Record<string, number> = { Karachi: 250, Lahore: 250
 export const cities = Object.keys(shippingRates)
 export const formatPKR = (amount: number) => new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(amount)
 
+// All shipments go out via Leopards Courier — this is their public tracking page's URL shape.
+export const getCourierTrackingUrl = (trackingNumber: string) => `https://pk.leopardscourier.com/shipment_tracking_view?cn_number=${encodeURIComponent(trackingNumber)}`
+
 // Estimated delivery window: order date + 4 days to order date + 6 days, expressed in
 // Pakistan calendar days (not UTC) so an order placed late at night doesn't drift a day off.
 export function getDeliveryWindow(orderDate: Date, minDays = 4, maxDays = 6): string {

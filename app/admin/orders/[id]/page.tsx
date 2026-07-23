@@ -1,11 +1,11 @@
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ExternalLink } from "lucide-react"
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { orderItems, orders } from "@/lib/db/schema"
-import { formatPKR } from "@/lib/store-data"
+import { formatPKR, getCourierTrackingUrl } from "@/lib/store-data"
 import { OrderStatusTimeline } from "@/components/order-status-timeline"
 import { OrderStatusSelect } from "@/components/order-status-select"
 import { ResendConfirmationButton } from "@/components/resend-confirmation-button"
@@ -64,7 +64,14 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               : "Not yet confirmed by customer"}
           </p>
           {order.status === "placed" && <ResendConfirmationButton orderId={order.id} />}
-          {order.trackingNumber && <p className="mt-1 text-sm text-muted-foreground">Tracking: {order.trackingNumber}</p>}
+          {order.trackingNumber && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+              Tracking: {order.trackingNumber}
+              <a href={getCourierTrackingUrl(order.trackingNumber)} target="_blank" rel="noreferrer" aria-label="Track shipment on Leopards Courier" className="text-primary">
+                <ExternalLink size={13} />
+              </a>
+            </p>
+          )}
         </div>
       </div>
 
