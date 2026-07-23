@@ -138,13 +138,13 @@ export function ProductDetail({ product, media }: { product: Product; media: Med
                 >
                   {item.kind === "video" ? (
                     <>
-                      <video src={item.url} preload="metadata" muted playsInline className="size-full object-cover" />
+                      <video src={item.url} preload="none" muted playsInline className="size-full object-cover" />
                       <span className="absolute inset-0 flex items-center justify-center bg-foreground/30">
                         <Play size={18} className="fill-background text-background" />
                       </span>
                     </>
                   ) : (
-                    <Image src={item.url} alt="" fill className="object-cover" />
+                    <Image src={item.url} alt="" fill sizes="80px" className="object-cover" />
                   )}
                 </button>
               ))}
@@ -157,7 +157,6 @@ export function ProductDetail({ product, media }: { product: Product; media: Med
           <p className="mt-5 text-2xl font-bold">
             {formatPKR(product.price)} {product.compareAtPrice && <span className="ml-2 text-base font-normal text-muted-foreground line-through">{formatPKR(product.compareAtPrice)}</span>}
           </p>
-          {!soldOut && product.stock <= 1 && <p className="mt-2 text-xs font-bold uppercase tracking-wider text-destructive">Only 1 pair available in this size!</p>}
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
             <p className="text-sm font-semibold text-foreground">
               Size <span className="font-normal text-muted-foreground">{product.size}</span>

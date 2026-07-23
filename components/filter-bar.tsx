@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Filter as FilterIcon, LayoutGrid, Rows3 } from "lucide-react"
+import { useShopPending } from "@/components/shop-pending-provider"
 
 const SORT_OPTIONS = [
   { value: "latest", label: "Newest" },
@@ -13,15 +14,23 @@ export function FilterBar({ onOpenFilters }: { onOpenFilters: () => void }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { startShopTransition } = useShopPending()
 
   const view = searchParams.get("view") === "list" ? "list" : "grid"
   const sort = searchParams.get("sort") ?? "latest"
+
+  const activeFilterCount =
+    (searchParams.get("size")?.split(",").filter(Boolean).length ?? 0) +
+    (searchParams.get("brand")?.split(",").filter(Boolean).length ?? 0) +
+    (searchParams.get("condition")?.split(",").filter(Boolean).length ?? 0) +
+    (searchParams.get("gender") ? 1 : 0) +
+    (searchParams.get("minPrice") || searchParams.get("maxPrice") ? 1 : 0)
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString())
     if (value && !(key === "sort" && value === "latest") && !(key === "view" && value === "grid")) params.set(key, value)
     else params.delete(key)
-    router.push(`${pathname}?${params.toString()}`)
+    startShopTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
   return (
@@ -30,10 +39,15 @@ export function FilterBar({ onOpenFilters }: { onOpenFilters: () => void }) {
         <button
           type="button"
           onClick={onOpenFilters}
-          className="flex shrink-0 items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground"
+          className="relative flex shrink-0 items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground"
         >
           <FilterIcon size={15} />
           Filter
+          {activeFilterCount > 0 && (
+            <span className="absolute -right-3 -top-2 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+              {activeFilterCount}
+            </span>
+          )}
         </button>
       </div>
 
