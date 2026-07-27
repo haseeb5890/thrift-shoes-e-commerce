@@ -5,6 +5,8 @@ import { Toaster } from "sonner"
 import { WhatsAppProvider } from "@/components/whatsapp-provider"
 import { WhatsAppFab } from "@/components/whatsapp-fab"
 import { WishlistProvider } from "@/components/wishlist-provider"
+import { ScrollRestorationGuard } from "@/components/scroll-restoration-guard"
+import { MetaPixel } from "@/components/meta-pixel"
 import "./globals.css"
 
 const sans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" })
@@ -17,6 +19,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className="bg-background">
       <body className={`${sans.variable} ${heading.variable} font-sans antialiased`}>
+        <ScrollRestorationGuard />
+        <MetaPixel />
         <WhatsAppProvider>
           <WishlistProvider>
             {children}

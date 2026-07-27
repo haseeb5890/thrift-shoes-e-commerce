@@ -29,7 +29,9 @@ function ProductTile({ product, onNavigate }: { product: Product; onNavigate: ()
       </div>
       <div>
         <p className="text-sm font-bold">{product.name}</p>
-        <p className="text-sm font-bold text-primary">{formatPKR(product.price)}</p>
+        <p className="text-sm font-bold text-primary">
+          {formatPKR(product.price)} {product.compareAtPrice && <span className="ml-1 text-xs font-normal text-muted-foreground line-through">{formatPKR(product.compareAtPrice)}</span>}
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">Size: {product.size}</p>
         <p className="text-xs text-muted-foreground">Condition: {product.condition}</p>
       </div>
@@ -124,20 +126,24 @@ export function SearchPanel() {
               </button>
             </form>
 
-            <p className="mt-6 text-xs font-bold uppercase tracking-widest text-muted-foreground">Trending now</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {TRENDING.map((chip) => (
-                <button
-                  key={chip.label}
-                  type="button"
-                  onClick={() => onTrendingClick(chip)}
-                  className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-                >
-                  <Search size={11} />
-                  {chip.label}
-                </button>
-              ))}
-            </div>
+            {!value.trim() && (
+              <>
+                <p className="mt-6 text-xs font-bold uppercase tracking-widest text-muted-foreground">Trending now</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {TRENDING.map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => onTrendingClick(chip)}
+                      className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                    >
+                      <Search size={11} />
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <div className="mt-6">
               {value.trim() ? (

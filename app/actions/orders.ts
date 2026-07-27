@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { and, desc, eq, gt, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { headers } from "next/headers"
 import { db } from "@/lib/db"
 import { orderItems, orders, products, promoCodes } from "@/lib/db/schema"
 import { getSessionUser, getSessionProfile, requireAdminAction } from "@/lib/auth-helpers"
@@ -10,6 +11,7 @@ import { getOrCreateProfile } from "@/lib/profiles"
 import { ORDER_STATUSES } from "@/lib/order-status"
 import { sendOrderConfirmationEmail, sendOrderConfirmedEmail, sendOrderCancelledEmail } from "@/lib/email"
 import { notifyNewOrder, notifyOrderConfirmed } from "@/lib/slack"
+import { sendConversionEvent } from "@/lib/meta-conversions-api"
 import { toCsv } from "@/lib/csv"
 import { text } from "stream/consumers"
 
@@ -92,8 +94,13 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
   revalidatePath("/shop")
   revalidatePath("/admin/orders")
 
-  // The order is already committed — email + Slack are side notifications, not required for
-  // the response, so run them concurrently instead of stacking their latency onto the checkout.
+  const requestHeaders = await headers()
+
+  // The order is already committed — email + Slack + the Meta Conversions API call are side
+  // effects, not required for the response, so run them concurrently instead of stacking their
+  // latency onto the checkout. This Purchase event is the server-side half of the pair with the
+  // browser Pixel's own Purchase call in checkout-form.tsx — they share `orderNumber` as the
+  // event_id so Meta dedupes them into one instead of double-counting the sale.
   await Promise.all([
     sendOrderConfirmationEmail({
       to: data.email,
@@ -114,6 +121,16 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
       total,
       paymentMethod: data.paymentMethod,
       items: data.items.map((item) => ({ slug: item.slug, name: item.name, size: item.size, imageUrl: item.imageUrl })),
+    }),
+    sendConversionEvent({
+      eventName: "Purchase",
+      eventId: orderNumber,
+      eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout`,
+      userAgent: requestHeaders.get("user-agent"),
+      email: data.email,
+      phone: data.phone,
+      value: total,
+      currency: "PKR",
     }),
   ])
 
