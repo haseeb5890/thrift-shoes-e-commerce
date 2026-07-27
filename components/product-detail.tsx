@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type TouchEvent } from "react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Check, ChevronLeft, ChevronRight, Minus, Play, Plus, ShieldCheck, Truck } from "lucide-react"
 import { toast } from "sonner"
 import { useStore } from "@/components/store-provider"
@@ -14,12 +14,12 @@ import { ProductDescription } from "@/components/product-description"
 import { ProductConditionGuide } from "@/components/product-condition-guide"
 import { SizeChartDialog } from "@/components/size-chart-dialog"
 import { fetchRelatedProducts } from "@/app/actions/related-products"
+import { trackPixelEvent } from "@/lib/meta-pixel"
 import { formatPKR, type Product } from "@/lib/store-data"
 
 type Media = { id: string; url: string; kind: string }
 
 export function ProductDetail({ product, media }: { product: Product; media: Media[] }) {
-  const router = useRouter()
   const { addToCart } = useStore()
   const { setMessage } = useWhatsAppMessage()
   const soldOut = product.stock <= 0
@@ -54,6 +54,24 @@ export function ProductDetail({ product, media }: { product: Product; media: Med
     return () => setMessage(null) // reset to the generic message once the visitor leaves this product
   }, [product.name, product.size, setMessage])
 
+  // /shop/[slug] is a dynamic route, so clicking a related-product card doesn't remount this
+  // page — it re-renders with new props in place. Without this, the visitor lands on the new
+  // product still scrolled to wherever they were on the previous one (often the related-products
+  // rail near the bottom), which reads as the page briefly showing "the footer".
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [product.id])
+
+  // Guards against firing twice for the same product: React 18 StrictMode double-invokes
+  // effects in dev on mount, and a plain "fire every time this runs" effect would send two
+  // identical ViewContent events for the very first product page a visitor lands on.
+  const lastViewedProductIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (lastViewedProductIdRef.current === product.id) return
+    lastViewedProductIdRef.current = product.id
+    trackPixelEvent("ViewContent", { content_ids: [product.id], content_name: product.name, content_type: "product", value: product.price, currency: "PKR" })
+  }, [product.id, product.name, product.price])
+
   useEffect(() => {
     let cancelled = false
     fetchRelatedProducts(product).then((rows) => {
@@ -83,9 +101,19 @@ export function ProductDetail({ product, media }: { product: Product; media: Med
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-14">
-      <button type="button" onClick={() => router.back()} className="mb-6 flex items-center gap-2 text-sm font-bold">
-        <ChevronLeft size={16} /> Back to shop
-      </button>
+      <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+        <Link href="/shop" className="hover:text-foreground">Shop</Link>
+        {product.category[0] && (
+          <>
+            <ChevronRight size={14} />
+            <Link href={`/shop?category=${encodeURIComponent(product.category[0])}`} className="hover:text-foreground">
+              {product.category[0]}
+            </Link>
+          </>
+        )}
+        <ChevronRight size={14} />
+        <span className="truncate text-foreground">{product.name}</span>
+      </nav>
       <div className="grid gap-8 md:grid-cols-2 md:gap-14">
         <div>
           <div
@@ -95,7 +123,10 @@ export function ProductDetail({ product, media }: { product: Product; media: Med
           >
             <div key={active.id} className="absolute inset-0 animate-in fade-in slide-in-from-right-4 duration-300">
               {active.kind === "video" ? (
-                <video src={active.url} controls className="size-full object-cover" />
+                // object-contain, not object-cover: a portrait video shot on a phone is much
+                // taller than this square viewer, and cover would crop off its top/bottom.
+                // Contain fits the whole clip inside instead, letterboxed against bg-secondary.
+                <video src={active.url} controls className="size-full object-contain" />
               ) : (
                 <Image src={active.url} alt={product.imageAlt} fill priority className="pointer-events-none object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
               )}

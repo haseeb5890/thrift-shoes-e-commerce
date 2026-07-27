@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { toast } from "sonner"
 import { createOrder } from "@/app/actions/orders"
 import { validatePromoCode } from "@/app/actions/promos"
 import { useStore } from "@/components/store-provider"
+import { trackPixelEvent } from "@/lib/meta-pixel"
 import { cities, formatPKR, getDeliveryWindow, shippingRates } from "@/lib/store-data"
 
 const field = "h-12 border border-input bg-card px-3 text-sm outline-none focus:border-primary"
@@ -24,6 +25,21 @@ export function CheckoutForm() {
   const subtotal = cart.reduce((sum,item)=>sum+item.price*item.quantity,0)
   const shipping = shippingRates[city] ?? shippingRates.Other
   const discount = appliedPromo?.discountAmount ?? 0
+
+  // Fires once per checkout visit, as soon as there's actually something to check out — a ref
+  // guard rather than an empty-deps effect because the cart can still be loading on first paint.
+  const firedInitiateCheckoutRef = useRef(false)
+  useEffect(() => {
+    if (firedInitiateCheckoutRef.current || cart.length === 0) return
+    firedInitiateCheckoutRef.current = true
+    trackPixelEvent("InitiateCheckout", {
+      content_ids: cart.map((item) => item.id),
+      contents: cart.map((item) => ({ id: item.id, quantity: item.quantity })),
+      num_items: cart.reduce((sum, item) => sum + item.quantity, 0),
+      value: subtotal,
+      currency: "PKR",
+    })
+  }, [cart, subtotal])
 
   function applyPromo() {
     setPromoError("")
@@ -61,6 +77,20 @@ export function CheckoutForm() {
 
     try {
       const order = await orderPromise
+      // Read cart items before clearCart() empties it — value/content_ids need to reflect what
+      // was actually purchased. The order number as eventId lets the server-side Conversions
+      // API call (sent from this same order in app/actions/orders.ts) dedupe against this one.
+      trackPixelEvent(
+        "Purchase",
+        {
+          content_ids: cart.map((item) => item.id),
+          contents: cart.map((item) => ({ id: item.id, quantity: item.quantity })),
+          num_items: cart.reduce((sum, item) => sum + item.quantity, 0),
+          value: order.total,
+          currency: "PKR",
+        },
+        order.orderNumber,
+      )
       setResult(order)
       clearCart()
     } catch (err) {

@@ -37,15 +37,19 @@ export async function searchProductsPreview(query: string, limit = 3): Promise<{
 
 export async function getPopularProducts(limit = 4): Promise<Product[]> {
   try {
-    const rows = await db
+    const featured = await db
       .select()
       .from(products)
       .where(and(eq(products.isActive, true), eq(products.isFeatured, true)))
       .orderBy(desc(products.createdAt))
       .limit(limit)
-    if (rows.length) return rows
+    if (featured.length) return featured
+
+    // No featured picks yet — fall back to the most recently listed active products instead of
+    // canned dummy data, so this reflects real inventory as soon as any exists.
+    return await db.select().from(products).where(eq(products.isActive, true)).orderBy(desc(products.createdAt)).limit(limit)
   } catch {
-    // fall through to in-memory fallback below
+    // DB unreachable — fall through to in-memory fallback below
   }
   return fallbackProducts.filter((p) => p.isFeatured).slice(0, limit)
 }
