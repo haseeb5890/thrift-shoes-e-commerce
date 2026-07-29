@@ -5,6 +5,7 @@ import { products } from "@/lib/db/schema"
 import { ExportCsvButton } from "@/components/export-csv-button"
 import { InlinePriceEditor } from "@/components/inline-price-editor"
 import { DeleteProductButton } from "@/components/delete-product-button"
+import { AdminUploadStatusBar } from "@/components/admin-upload-status-bar"
 
 const PAGE_SIZE = 20
 
@@ -27,7 +28,10 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
           <Link href="/admin/products/new" className="flex h-12 items-center bg-primary px-6 font-bold text-primary-foreground">Add product</Link>
         </div>
       </div>
-      <div className="mt-8 overflow-x-auto bg-background p-5">
+      <div className="mt-8">
+        <AdminUploadStatusBar />
+      </div>
+      <div className="overflow-x-auto bg-background p-5">
         <table className="w-full min-w-95 text-left text-sm md:min-w-180">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr>

@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react"
 import { requireAdminPage } from "@/lib/auth-helpers"
 import { AdminNav } from "@/components/admin-nav"
 import { Logo } from "@/components/logo"
+import { AdminProductUploadProvider } from "@/components/admin-product-upload-provider"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdminPage()
@@ -27,7 +28,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <AdminNav />
         </div>
       </header>
-      {children}
+      <AdminProductUploadProvider>{children}</AdminProductUploadProvider>
     </div>
   )
 }

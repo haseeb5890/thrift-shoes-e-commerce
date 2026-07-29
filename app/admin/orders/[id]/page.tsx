@@ -54,6 +54,12 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Payment</h2>
           <p className="mt-2 text-sm capitalize">{order.paymentMethod === "cod" ? "Cash on delivery" : order.paymentMethod}</p>
           <p className="text-sm capitalize text-muted-foreground">{order.paymentStatus}</p>
+          {order.advancePaid > 0 && (
+            <div className="mt-3 border-t border-border pt-3">
+              <p className="text-sm text-muted-foreground">Advance received: {formatPKR(order.advancePaid)}</p>
+              <p className="text-sm font-bold">Balance due on parcel: {formatPKR(order.total - order.advancePaid)}</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-background p-5">
