@@ -5,6 +5,7 @@ import { products } from "@/lib/db/schema"
 import { ExportCsvButton } from "@/components/export-csv-button"
 import { InlinePriceEditor } from "@/components/inline-price-editor"
 import { DeleteProductButton } from "@/components/delete-product-button"
+import { AdminBuyButton } from "@/components/admin-buy-button"
 
 const PAGE_SIZE = 20
 
@@ -46,7 +47,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
               <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">No products yet.</td></tr>
             ) : (
               productRows.map((product) => (
-                <tr key={product.id} className="border-b border-border">
+                <tr key={product.id} className="border-b border-border align-top">
                   <td className="px-3 py-4 font-bold">{product.name}</td>
                   <td className="hidden px-3 py-4 md:table-cell">{product.brand}</td>
                   <td className="hidden px-3 py-4 md:table-cell">{product.category.join(", ")}</td>
@@ -57,9 +58,12 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
                     <span className={`text-xs font-bold uppercase ${product.stock ? "text-accent" : "text-destructive"}`}>{product.stock ? "Live" : "Sold"}</span>
                   </td>
                   <td className="px-3 py-4 text-right">
-                    <div className="flex items-center justify-end gap-4">
-                      <Link href={`/admin/products/${product.id}/edit`} className="text-xs font-bold uppercase tracking-widest underline">Edit</Link>
-                      <DeleteProductButton productId={product.id} productName={product.name} />
+                    <div className="flex flex-col items-end gap-3">
+                      <div className="flex items-center gap-4">
+                        <Link href={`/admin/products/${product.id}/edit`} className="text-xs font-bold uppercase tracking-widest underline">Edit</Link>
+                        <DeleteProductButton productId={product.id} productName={product.name} />
+                      </div>
+                      {product.stock > 0 && <AdminBuyButton productId={product.id} productName={product.name} />}
                     </div>
                   </td>
                 </tr>

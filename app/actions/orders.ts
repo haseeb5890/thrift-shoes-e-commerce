@@ -13,13 +13,15 @@ import { sendOrderConfirmationEmail, sendOrderConfirmedEmail, sendOrderCancelled
 import { notifyNewOrder, notifyOrderConfirmed } from "@/lib/slack"
 import { sendConversionEvent } from "@/lib/meta-conversions-api"
 import { toCsv } from "@/lib/csv"
-import { text } from "stream/consumers"
 
 const CONFIRMATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 const checkoutSchema = z.object({ customerName: z.string().min(2), email: z.email(), phone: z.string().regex(/^03\d{9}$/), city: z.string().min(2), addressLine: z.string().min(8), postalCode: z.string().optional(), paymentMethod: z.enum(["cod", "bank"]), notes: z.string().optional(), items: z.array(z.object({ id: z.string(), slug: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1), shippingFee: z.number().int().nonnegative(), promoCode: z.string().optional() })
 
-export async function createOrder(input: z.infer<typeof checkoutSchema>): Promise<{ error: string } | { orderNumber: string; total: number; paymentMethod: "cod" | "bank" }> {
+export async function createOrder(
+  input: z.infer<typeof checkoutSchema>,
+  opts?: { source?: "customer" | "admin" },
+): Promise<{ error: string } | { orderNumber: string; total: number; paymentMethod: "cod" | "bank" }> {
   let data: z.infer<typeof checkoutSchema>
   try {
     data = checkoutSchema.parse(input)
@@ -76,7 +78,7 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
       }
 
       const total = subtotal + data.shippingFee - discountAmount
-      await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: "pending", status: "placed", isNew: true, subtotal, shippingFee: data.shippingFee, promoCode: appliedPromoCode, discountAmount, total, notes: data.notes, confirmationToken, confirmationExpiresAt })
+      await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: "pending", status: "placed", isNew: true, source: opts?.source ?? "customer", subtotal, shippingFee: data.shippingFee, promoCode: appliedPromoCode, discountAmount, total, notes: data.notes, confirmationToken, confirmationExpiresAt })
       await tx.insert(orderItems).values(data.items.map((item) => ({ id: crypto.randomUUID(), orderId: id, productId: item.id, productSlug: item.slug, productName: item.name, size: item.size, quantity: 1, unitPrice: item.price, imageUrl: item.imageUrl })))
     })
   } catch (err) {
@@ -135,6 +137,46 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
   ])
 
   return { orderNumber, total, paymentMethod: data.paymentMethod }
+}
+
+/**
+ * Admin buys a product from their own catalog (e.g. taking personal stock, a write-off, or
+ * recording an offline sale). Reuses createOrder entirely — same profile linking, stock claim
+ * (including the soldAt stamp the cleanup cron depends on), confirmation email, Slack alert,
+ * and Meta Conversions API Purchase event — so it's indistinguishable from a real order except
+ * for `source: "admin"`, which drives the badge in /admin/orders and is included in Analytics
+ * revenue/order-count per product decision.
+ *
+ * Note: this also fires a Meta Purchase conversion event like any other order. If that's not
+ * desired for internal purchases (it will affect ad-performance reporting), flag it and this
+ * can be made conditional on source.
+ */
+export async function createAdminOrder(
+  productId: string,
+  pricePaid: number,
+  notes?: string,
+): Promise<{ error: string } | { orderNumber: string; total: number; paymentMethod: "cod" | "bank" }> {
+  const admin = await requireAdminAction()
+
+  const [product] = await db.select().from(products).where(eq(products.id, productId))
+  if (!product) return { error: "Product not found." }
+  if (product.stock <= 0) return { error: "This product is already sold." }
+  if (!Number.isInteger(pricePaid) || pricePaid <= 0) return { error: "Enter a valid amount." }
+
+  return createOrder(
+    {
+      customerName: (admin.user_metadata?.name as string | undefined) ?? "Store Admin",
+      email: admin.email!,
+      phone: "03000000000", // internal transaction — not a real customer phone
+      city: "Karachi",
+      addressLine: "Admin self-purchase",
+      paymentMethod: "cod",
+      notes: notes || "Recorded via Buy as Admin",
+      shippingFee: 0,
+      items: [{ id: product.id, slug: product.slug, name: product.name, size: product.size, price: pricePaid, imageUrl: product.imageUrl }],
+    },
+    { source: "admin" },
+  )
 }
 
 const CANCELLABLE_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours
