@@ -137,6 +137,100 @@ export async function createOrder(input: z.infer<typeof checkoutSchema>): Promis
   return { orderNumber, total, paymentMethod: data.paymentMethod }
 }
 
+const adminOrderSchema = z.object({
+  customerName: z.string().min(2),
+  email: z.email(),
+  phone: z.string().regex(/^03\d{9}$/),
+  city: z.string().min(2),
+  addressLine: z.string().min(8),
+  postalCode: z.string().optional(),
+  paymentMethod: z.enum(["cod", "bank"]),
+  notes: z.string().optional(),
+  shippingFee: z.number().int().nonnegative(),
+  advancePaid: z.number().int().nonnegative(),
+  items: z.array(z.object({ id: z.string(), slug: z.string(), name: z.string(), size: z.string(), price: z.number().int().positive(), imageUrl: z.string() })).min(1),
+})
+
+/**
+ * Records a sale made outside the site (WhatsApp DM, in-person, etc.) as a real order — same
+ * shipping/customer record as a normal checkout, so it shows up in /admin/orders for fulfillment
+ * and tracking like any other order, just tagged source: "admin". Deliberately a separate action
+ * from createOrder (not a shared code path) since it trusts admin-entered item prices — that
+ * must never be reachable from the customer-facing checkout action.
+ *
+ * No Meta Purchase event here: unlike a real checkout, there's no customer browser session to
+ * attach it to (this runs from the admin's own browser), so sending one would misattribute the
+ * admin's device as the buyer's.
+ */
+export async function createAdminOrder(input: z.infer<typeof adminOrderSchema>): Promise<{ error: string } | { orderNumber: string; total: number }> {
+  await requireAdminAction()
+
+  let data: z.infer<typeof adminOrderSchema>
+  try {
+    data = adminOrderSchema.parse(input)
+  } catch {
+    return { error: "Please check the order details — phone must be a Pakistan mobile number like 03001234567." }
+  }
+
+  const id = crypto.randomUUID()
+  const orderNumber = `RLP-${Date.now().toString().slice(-7)}`
+  const subtotal = data.items.reduce((sum, item) => sum + item.price, 0)
+  const total = subtotal + data.shippingFee
+  const confirmationToken = crypto.randomUUID()
+  const confirmationExpiresAt = new Date(Date.now() + CONFIRMATION_TOKEN_TTL_MS)
+
+  try {
+    await db.transaction(async (tx) => {
+      const profile = await getOrCreateProfile(tx, { email: data.email, fullName: data.customerName, phone: data.phone, authUserId: null })
+
+      for (const item of data.items) {
+        const [claimed] = await tx
+          .update(products)
+          .set({ stock: sql`${products.stock} - 1`, soldAt: sql`case when ${products.stock} - 1 <= 0 then now() else ${products.soldAt} end` })
+          .where(and(eq(products.id, item.id), gt(products.stock, 0)))
+          .returning({ id: products.id })
+        if (!claimed) throw new Error(`SOLD_OUT:${item.name} (${item.size})`)
+      }
+
+      await tx.insert(orders).values({ id, orderNumber, userId: profile.id, customerName: data.customerName, email: data.email, phone: data.phone, city: data.city, addressLine: data.addressLine, postalCode: data.postalCode, paymentMethod: data.paymentMethod, paymentStatus: data.advancePaid >= total ? "paid" : "pending", status: "placed", isNew: true, subtotal, shippingFee: data.shippingFee, discountAmount: 0, total, notes: data.notes, source: "admin", advancePaid: data.advancePaid, confirmationToken, confirmationExpiresAt })
+      await tx.insert(orderItems).values(data.items.map((item) => ({ id: crypto.randomUUID(), orderId: id, productId: item.id, productSlug: item.slug, productName: item.name, size: item.size, quantity: 1, unitPrice: item.price, imageUrl: item.imageUrl })))
+    })
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("SOLD_OUT:")) {
+      return { error: `${err.message.slice(9)} is already sold — remove it and try again.` }
+    }
+    return { error: "We couldn't save this order. Please try again." }
+  }
+
+  revalidatePath("/shop")
+  revalidatePath("/admin")
+  revalidatePath("/admin/products")
+  revalidatePath("/admin/orders")
+
+  await Promise.all([
+    sendOrderConfirmationEmail({
+      to: data.email,
+      customerName: data.customerName,
+      orderNumber,
+      items: data.items.map((item) => ({ name: item.name, size: item.size, price: item.price, imageUrl: item.imageUrl })),
+      subtotal,
+      shippingFee: data.shippingFee,
+      total,
+      confirmationToken,
+    }),
+    notifyNewOrder({
+      orderNumber,
+      customerName: data.customerName,
+      city: data.city,
+      total,
+      paymentMethod: data.paymentMethod,
+      items: data.items.map((item) => ({ slug: item.slug, name: item.name, size: item.size, imageUrl: item.imageUrl })),
+    }),
+  ])
+
+  return { orderNumber, total }
+}
+
 const CANCELLABLE_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours
 
 /**
@@ -198,6 +292,29 @@ export async function cancelOrderAsCustomer(orderId: string): Promise<{ error: s
   revalidatePath("/track")
   revalidatePath("/admin/orders")
   revalidatePath("/shop")
+  return { success: true }
+}
+
+// Lets an admin record an advance a customer sent directly (WhatsApp/bank transfer) against ANY
+// order, not just ones created through createAdminOrder — a website order can just as easily
+// have a partial advance paid outside the checkout flow. Recomputes paymentStatus the same way
+// createAdminOrder does, so "Balance due on parcel" stays accurate wherever it's shown.
+export async function updateOrderAdvancePayment(orderId: string, advancePaid: number): Promise<{ error: string } | { success: true }> {
+  await requireAdminAction()
+
+  if (!Number.isInteger(advancePaid) || advancePaid < 0) return { error: "Enter a valid amount." }
+
+  const [order] = await db.select({ total: orders.total }).from(orders).where(eq(orders.id, orderId))
+  if (!order) return { error: "Order not found." }
+  if (advancePaid > order.total) return { error: "Advance can't be more than the order total." }
+
+  await db.update(orders).set({
+    advancePaid,
+    paymentStatus: advancePaid >= order.total ? "paid" : "pending",
+    updatedAt: new Date(),
+  }).where(eq(orders.id, orderId))
+
+  revalidatePath("/admin/orders")
   return { success: true }
 }
 
@@ -330,6 +447,7 @@ export async function exportOrdersCsv(): Promise<string> {
     { key: "subtotal", label: "Subtotal" },
     { key: "shippingFee", label: "Shipping Fee" },
     { key: "total", label: "Total" },
+    { key: "advancePaid", label: "Advance Paid" },
     { key: "trackingNumber", label: "Tracking Number" },
     { key: "confirmedAt", label: "Confirmed At" },
     { key: "createdAt", label: "Placed At" },
