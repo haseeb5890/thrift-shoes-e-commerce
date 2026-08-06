@@ -6,7 +6,6 @@ import { requireAdminAction } from "@/lib/auth-helpers"
 import { r2, R2_BUCKET, publicUrlFor, deleteMediaByUrls } from "@/lib/r2"
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8MB — client-side compression should land well under this
-const MAX_VIDEO_BYTES = 5 * 1024 * 1024 // 5MB — matches the local compressor tool's target
 
 /**
  * Returns a short-lived presigned PUT URL so the admin's browser can upload the file straight to
@@ -21,9 +20,8 @@ export async function getMediaUploadUrl(input: {
 }): Promise<{ error: string } | { uploadUrl: string; publicUrl: string }> {
   await requireAdminAction()
 
-  const limit = input.kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
-  if (input.size > limit) {
-    return { error: `${input.kind === "video" ? "Video" : "Image"} must be under ${(limit / (1024 * 1024)).toFixed(1)}MB.` }
+  if (input.kind === "image" && input.size > MAX_IMAGE_BYTES) {
+    return { error: `Image must be under ${(MAX_IMAGE_BYTES / (1024 * 1024)).toFixed(1)}MB.` }
   }
   if (input.kind === "image" && !input.contentType.startsWith("image/")) return { error: "File must be an image." }
   if (input.kind === "video" && !input.contentType.startsWith("video/")) return { error: "File must be a video." }
