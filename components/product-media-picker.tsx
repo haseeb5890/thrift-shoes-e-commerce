@@ -152,8 +152,7 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
         {imagesRequired && images.length === 0 && <p className="mt-1 text-xs text-muted-foreground">At least one photo is required.</p>}
       </div>
       <div>
-        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product video (optional, max 30s / 5MB)</label>
-        <p className="mt-1 text-xs text-muted-foreground">Compress it first with the local video-compressor tool (in the <code>video-compressor</code> project alongside this one).</p>
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product video (optional)</label>
         <input type="file" accept="video/*" onChange={onVideoChange} className="mt-2 block w-full text-sm" />
         {video && (
           <div className="relative mt-3 max-w-xs">
