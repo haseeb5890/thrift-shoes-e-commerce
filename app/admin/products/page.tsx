@@ -5,7 +5,7 @@ import { products } from "@/lib/db/schema"
 import { ExportCsvButton } from "@/components/export-csv-button"
 import { InlinePriceEditor } from "@/components/inline-price-editor"
 import { DeleteProductButton } from "@/components/delete-product-button"
-import { AdminBuyButton } from "@/components/admin-buy-button"
+import { AdminUploadStatusBar } from "@/components/admin-upload-status-bar"
 
 const PAGE_SIZE = 20
 
@@ -28,7 +28,10 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
           <Link href="/admin/products/new" className="flex h-12 items-center bg-primary px-6 font-bold text-primary-foreground">Add product</Link>
         </div>
       </div>
-      <div className="mt-8 overflow-x-auto bg-background p-5">
+      <div className="mt-8">
+        <AdminUploadStatusBar />
+      </div>
+      <div className="overflow-x-auto bg-background p-5">
         <table className="w-full min-w-95 text-left text-sm md:min-w-180">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr>
@@ -58,12 +61,9 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
                     <span className={`text-xs font-bold uppercase ${product.stock ? "text-accent" : "text-destructive"}`}>{product.stock ? "Live" : "Sold"}</span>
                   </td>
                   <td className="px-3 py-4 text-right">
-                    <div className="flex flex-col items-end gap-3">
-                      <div className="flex items-center gap-4">
-                        <Link href={`/admin/products/${product.id}/edit`} className="text-xs font-bold uppercase tracking-widest underline">Edit</Link>
-                        <DeleteProductButton productId={product.id} productName={product.name} />
-                      </div>
-                      {product.stock > 0 && <AdminBuyButton productId={product.id} productName={product.name} />}
+                    <div className="flex items-center justify-end gap-4">
+                      <Link href={`/admin/products/${product.id}/edit`} className="text-xs font-bold uppercase tracking-widest underline">Edit</Link>
+                      <DeleteProductButton productId={product.id} productName={product.name} />
                     </div>
                   </td>
                 </tr>

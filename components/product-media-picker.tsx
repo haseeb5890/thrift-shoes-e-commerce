@@ -1,7 +1,6 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { useFormStatus } from "react-dom"
 import { X } from "lucide-react"
 import { toast } from "sonner"
 import imageCompression from "browser-image-compression"
@@ -153,8 +152,7 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
         {imagesRequired && images.length === 0 && <p className="mt-1 text-xs text-muted-foreground">At least one photo is required.</p>}
       </div>
       <div>
-        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product video (optional, max 30s / 5MB)</label>
-        <p className="mt-1 text-xs text-muted-foreground">Compress it first with the local video-compressor tool (in the <code>video-compressor</code> project alongside this one).</p>
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product video (optional)</label>
         <input type="file" accept="video/*" onChange={onVideoChange} className="mt-2 block w-full text-sm" />
         {video && (
           <div className="relative mt-3 max-w-xs">
@@ -179,14 +177,13 @@ export function ProductMediaPicker({ imagesRequired = true, submitLabel }: { ima
   )
 }
 
-/** Reads the parent form's pending state via useFormStatus, so the button also disables and
- * shows a loading label while createProduct/updateProduct is actually running server-side —
- * not just while media is still uploading client-side. */
+// The parent form (AdminProductForm) submits via onSubmit and navigates away immediately rather
+// than waiting on createProduct/updateProduct — so there's no meaningful "saving" pending state
+// to show here beyond the client-side upload progress this button already gates on.
 function SubmitButton({ canSubmit, stillUploading, submitLabel }: { canSubmit: boolean; stillUploading: boolean; submitLabel: string }) {
-  const { pending } = useFormStatus()
   return (
-    <button type="submit" disabled={!canSubmit || pending} className="h-12 bg-primary font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-      {stillUploading ? "Uploading..." : pending ? "Saving..." : submitLabel}
+    <button type="submit" disabled={!canSubmit} className="h-12 bg-primary font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+      {stillUploading ? "Uploading..." : submitLabel}
     </button>
   )
 }
