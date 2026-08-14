@@ -128,7 +128,12 @@ export default async function AdminOrdersPage({
                 return (
                   <tr key={order.id} className="border-b border-border align-top odd:bg-secondary/60">
                     <td className="px-3 py-4 font-bold">
-                      <Link href={`/admin/orders/${order.id}`} className="underline">{order.orderNumber}</Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/admin/orders/${order.id}`} className="underline">{order.orderNumber}</Link>
+                        {order.source === "admin" && (
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Admin</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-4">
                       <span className="flex items-center gap-1.5">

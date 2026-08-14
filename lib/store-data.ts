@@ -24,7 +24,7 @@ export const fallbackProducts: Product[] = [
   { id: "p4", slug: "crimson-mile", name: "Crimson Mile", brand: "New Balance", category: ["Running"], gender: "Women", size: "EU 39", condition: "Very Good", description: null, price: 11600, compareAtPrice: 14800, imageUrl: "/images/runner-red.png", imageAlt: "Red and cream vintage running shoes", color: "Red", isFeatured: true, stock: 1 },
 ]
 
-export const shippingRates: Record<string, number> = { Karachi: 250, Lahore: 250, Islamabad: 250, Rawalpindi: 250, Faisalabad: 350, Multan: 350, Peshawar: 350, Quetta: 350, Sialkot: 350, Gujranwala: 350, Hyderabad: 350, Other: 450 }
+export const shippingRates: Record<string, number> = { Karachi: 300, Lahore: 350, Islamabad: 350, Rawalpindi: 350, Faisalabad: 350, Multan: 350, Peshawar: 400, Quetta: 400, Sialkot: 350, Gujranwala: 350, Hyderabad: 350, Other: 450 }
 export const cities = Object.keys(shippingRates)
 export const formatPKR = (amount: number) => new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(amount)
 

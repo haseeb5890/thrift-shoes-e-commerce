@@ -13,7 +13,6 @@ import { sendOrderConfirmationEmail, sendOrderConfirmedEmail, sendOrderCancelled
 import { notifyNewOrder, notifyOrderConfirmed } from "@/lib/slack"
 import { sendConversionEvent } from "@/lib/meta-conversions-api"
 import { toCsv } from "@/lib/csv"
-import { text } from "stream/consumers"
 
 const CONFIRMATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
@@ -160,7 +159,7 @@ const adminOrderSchema = z.object({
  *
  * No Meta Purchase event here: unlike a real checkout, there's no customer browser session to
  * attach it to (this runs from the admin's own browser), so sending one would misattribute the
- * admin's device as the buyer's.
+ * admin's device as the buyer.
  */
 export async function createAdminOrder(input: z.infer<typeof adminOrderSchema>): Promise<{ error: string } | { orderNumber: string; total: number }> {
   await requireAdminAction()
