@@ -50,7 +50,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
               <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">No products yet.</td></tr>
             ) : (
               productRows.map((product) => (
-                <tr key={product.id} className="border-b border-border">
+                <tr key={product.id} className="border-b border-border align-top">
                   <td className="px-3 py-4 font-bold">{product.name}</td>
                   <td className="hidden px-3 py-4 md:table-cell">{product.brand}</td>
                   <td className="hidden px-3 py-4 md:table-cell">{product.category.join(", ")}</td>
